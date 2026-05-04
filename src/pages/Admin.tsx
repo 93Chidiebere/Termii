@@ -1,0 +1,577 @@
+import { useEffect, useRef, useState } from "react";
+import { Navigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  Users, ShieldCheck, Flag, Ban, Search, ChevronRight,
+  CheckCircle, XCircle, Clock, AlertTriangle, ExternalLink, ArrowLeft,
+  Image as ImageIcon, Upload, RotateCcw,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { useAuthStore } from "@/stores/authStore";
+import { useRoleStore } from "@/stores/roleStore";
+import {
+  mockAdminUsers, mockCreatorRequests, mockFlaggedPosts,
+  type AdminUser, type CreatorRequest, type FlaggedPost, type UserStatus,
+} from "@/data/mockAdminData";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from "@/components/ui/dialog";
+import { useToast } from "@/hooks/use-toast";
+import {
+  generateFaviconFromFile, loadStoredFavicon, clearFavicon,
+} from "@/lib/favicon";
+
+type AdminTab = "users" | "creators" | "flagged" | "suspend" | "branding";
+
+const tabs: { value: AdminTab; label: string; icon: React.ElementType }[] = [
+  { value: "users", label: "Users", icon: Users },
+  { value: "creators", label: "Creators", icon: ShieldCheck },
+  { value: "flagged", label: "Flagged", icon: Flag },
+  { value: "suspend", label: "Suspend/Ban", icon: Ban },
+  { value: "branding", label: "Branding", icon: ImageIcon },
+];
+
+const statusBadge: Record<UserStatus, { label: string; className: string }> = {
+  active: { label: "Active", className: "bg-green-500/10 text-green-600" },
+  suspended: { label: "Suspended", className: "bg-yellow-500/10 text-yellow-600" },
+  banned: { label: "Banned", className: "bg-destructive/10 text-destructive" },
+};
+
+const Admin = () => {
+  const { user, isAuthenticated } = useAuthStore();
+  const { hasRole } = useRoleStore();
+
+  // Protect route
+  if (!isAuthenticated || !user || !hasRole(user.id, "admin")) {
+    return <Navigate to="/feed" replace />;
+  }
+
+  return <AdminPanel />;
+};
+
+const AdminPanel = () => {
+  const [activeTab, setActiveTab] = useState<AdminTab>("users");
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Top bar */}
+      <header className="sticky top-0 z-40 bg-card border-b border-border px-4 py-3">
+        <div className="max-w-6xl mx-auto flex items-center gap-4">
+          <Link to="/feed" className="text-muted-foreground hover:text-foreground">
+            <ArrowLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="font-display text-lg font-bold text-foreground">Admin Panel</h1>
+            <p className="text-xs text-muted-foreground">Termii Management</p>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-4 py-6">
+        {/* Tab nav */}
+        <div className="flex gap-1.5 overflow-x-auto pb-4 mb-6 scrollbar-hide">
+          {tabs.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              onClick={() => setActiveTab(value)}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors ${
+                activeTab === value
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              <Icon size={16} />
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
+          {activeTab === "users" && <UsersTab />}
+          {activeTab === "creators" && <CreatorsTab />}
+          {activeTab === "flagged" && <FlaggedTab />}
+          {activeTab === "suspend" && <SuspendBanTab />}
+          {activeTab === "branding" && <BrandingTab />}
+        </motion.div>
+      </div>
+    </div>
+  );
+};
+
+/* ====== USERS TAB ====== */
+const UsersTab = () => {
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+
+  const filtered = mockAdminUsers.filter((u) => {
+    const matchSearch = u.displayName.toLowerCase().includes(search.toLowerCase()) ||
+      u.username.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase());
+    const matchStatus = statusFilter === "all" || u.status === statusFilter;
+    return matchSearch && matchStatus;
+  });
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <input
+            value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search users..."
+            className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+        </div>
+        <div className="flex gap-1.5">
+          {(["all", "active", "suspended", "banned"] as const).map((s) => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`px-3 py-2 rounded-lg text-xs font-semibold capitalize transition-colors ${
+                statusFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+              }`}
+            >{s}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card border border-border rounded-xl overflow-hidden">
+        <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 p-3 border-b border-border text-xs font-semibold text-muted-foreground uppercase">
+          <span>User</span><span>Email</span><span>Status</span><span>Reports</span><span></span>
+        </div>
+        {filtered.map((u) => (
+          <button key={u.id} onClick={() => setSelectedUser(u)}
+            className="w-full grid grid-cols-[1fr_auto] sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 p-3 items-center hover:bg-muted/50 transition-colors text-left border-b border-border last:border-0"
+          >
+            <div className="flex items-center gap-3">
+              <img src={u.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
+              <div>
+                <p className="text-sm font-semibold text-foreground">{u.displayName}</p>
+                <p className="text-xs text-muted-foreground">@{u.username}</p>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground hidden sm:block">{u.email}</p>
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full w-fit hidden sm:block ${statusBadge[u.status].className}`}>
+              {statusBadge[u.status].label}
+            </span>
+            <p className="text-xs text-muted-foreground hidden sm:block">{u.reportCount}</p>
+            <ChevronRight size={16} className="text-muted-foreground" />
+          </button>
+        ))}
+        {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No users found</p>}
+      </div>
+
+      {/* User detail dialog */}
+      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">User Profile</DialogTitle>
+            <DialogDescription>Viewing user details</DialogDescription>
+          </DialogHeader>
+          {selectedUser && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <img src={selectedUser.avatar} alt="" className="w-14 h-14 rounded-full object-cover" />
+                <div>
+                  <p className="font-semibold text-foreground">{selectedUser.displayName}</p>
+                  <p className="text-xs text-muted-foreground">@{selectedUser.username}</p>
+                </div>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="text-foreground">{selectedUser.email}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className={`font-semibold px-2 py-0.5 rounded-full text-xs ${statusBadge[selectedUser.status].className}`}>{statusBadge[selectedUser.status].label}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Joined</span><span className="text-foreground">{selectedUser.joinedAt}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Reports</span><span className="text-foreground">{selectedUser.reportCount}</span></div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+/* ====== CREATORS TAB ====== */
+const CreatorsTab = () => {
+  const [requests, setRequests] = useState(mockCreatorRequests);
+  const [confirmAction, setConfirmAction] = useState<{ id: string; action: "approve" | "reject" } | null>(null);
+
+  const pending = requests.filter((r) => r.status === "pending");
+  const processed = requests.filter((r) => r.status !== "pending");
+
+  const handleAction = () => {
+    if (!confirmAction) return;
+    setRequests((prev) =>
+      prev.map((r) =>
+        r.id === confirmAction.id
+          ? { ...r, status: confirmAction.action === "approve" ? "approved" as const : "rejected" as const }
+          : r
+      )
+    );
+    setConfirmAction(null);
+  };
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-foreground mb-4">
+        Pending Requests ({pending.length})
+      </h2>
+      {pending.length === 0 && (
+        <div className="bg-card border border-border rounded-xl p-8 text-center text-sm text-muted-foreground mb-6">
+          No pending creator requests
+        </div>
+      )}
+      <div className="space-y-3 mb-8">
+        {pending.map((req) => (
+          <CreatorCard key={req.id} request={req} onAction={(action) => setConfirmAction({ id: req.id, action })} />
+        ))}
+      </div>
+
+      {processed.length > 0 && (
+        <>
+          <h2 className="font-display text-lg font-semibold text-foreground mb-4">Processed</h2>
+          <div className="space-y-3">
+            {processed.map((req) => <CreatorCard key={req.id} request={req} />)}
+          </div>
+        </>
+      )}
+
+      <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
+        <AlertDialogContent className="rounded-2xl max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">
+              {confirmAction?.action === "approve" ? "Approve Creator?" : "Reject Request?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmAction?.action === "approve"
+                ? "This user will gain creator privileges and badges."
+                : "This request will be rejected. The user can reapply later."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleAction}
+              className={`rounded-xl ${confirmAction?.action === "reject" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}`}
+            >
+              {confirmAction?.action === "approve" ? "Approve" : "Reject"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+const CreatorCard = ({ request, onAction }: { request: CreatorRequest; onAction?: (action: "approve" | "reject") => void }) => (
+  <div className="bg-card border border-border rounded-xl p-4">
+    <div className="flex items-center gap-3 mb-3">
+      <img src={request.user.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-foreground">{request.user.displayName}</p>
+        <p className="text-xs text-muted-foreground">@{request.user.username} · {request.requestedAt}</p>
+      </div>
+      {request.status === "approved" && <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-500/10 text-green-600">Approved</span>}
+      {request.status === "rejected" && <span className="text-xs font-semibold px-2 py-1 rounded-full bg-destructive/10 text-destructive">Rejected</span>}
+      {request.status === "pending" && <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600">Pending</span>}
+    </div>
+    <p className="text-sm text-foreground mb-2">{request.reason}</p>
+    <p className="text-xs text-muted-foreground flex items-center gap-1 mb-3">
+      <ExternalLink size={12} /> {request.portfolio}
+    </p>
+    {request.status === "pending" && onAction && (
+      <div className="flex gap-2">
+        <button onClick={() => onAction("approve")}
+          className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+        >
+          <CheckCircle size={14} /> Approve
+        </button>
+        <button onClick={() => onAction("reject")}
+          className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+        >
+          <XCircle size={14} /> Reject
+        </button>
+      </div>
+    )}
+  </div>
+);
+
+/* ====== FLAGGED TAB ====== */
+const FlaggedTab = () => {
+  const [reports, setReports] = useState(mockFlaggedPosts);
+
+  const open = reports.filter((r) => r.status === "open");
+  const resolved = reports.filter((r) => r.status !== "open");
+
+  const dismiss = (id: string) => setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: "dismissed" as const } : r));
+  const takeAction = (id: string) => setReports((prev) => prev.map((r) => r.id === id ? { ...r, status: "actioned" as const } : r));
+
+  const reasonLabel: Record<string, string> = {
+    spam: "Spam", harassment: "Harassment", inappropriate: "Inappropriate", misinformation: "Misinformation", other: "Other",
+  };
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-foreground mb-4">Open Reports ({open.length})</h2>
+      {open.length === 0 && (
+        <div className="bg-card border border-border rounded-xl p-8 text-center text-sm text-muted-foreground mb-6">
+          No open reports 🎉
+        </div>
+      )}
+      <div className="space-y-3 mb-8">
+        {open.map((report) => (
+          <div key={report.id} className="bg-card border border-border rounded-xl p-4">
+            <div className="flex items-center gap-3 mb-3">
+              <img src={report.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-foreground">{report.author.displayName}</p>
+                <p className="text-xs text-muted-foreground">@{report.author.username}</p>
+              </div>
+              <span className="text-xs font-semibold px-2 py-1 rounded-full bg-destructive/10 text-destructive">
+                {reasonLabel[report.reason]}
+              </span>
+            </div>
+            <p className="text-sm text-foreground mb-2 line-clamp-2">"{report.caption}"</p>
+            <p className="text-xs text-muted-foreground mb-3">{report.details}</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Reported by <span className="font-medium text-foreground">{report.reporter.displayName}</span> · {report.reportedAt}
+            </p>
+            <div className="flex gap-2">
+              <button onClick={() => takeAction(report.id)}
+                className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+              >
+                <AlertTriangle size={14} /> Take Action
+              </button>
+              <button onClick={() => dismiss(report.id)}
+                className="flex-1 py-2 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold hover:bg-secondary/80 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {resolved.length > 0 && (
+        <>
+          <h2 className="font-display text-lg font-semibold text-foreground mb-4">Resolved</h2>
+          <div className="space-y-3">
+            {resolved.map((r) => (
+              <div key={r.id} className="bg-card border border-border rounded-xl p-4 opacity-60">
+                <div className="flex items-center gap-3">
+                  <img src={r.author.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-foreground">{r.author.displayName}</p>
+                    <p className="text-xs text-muted-foreground">{reasonLabel[r.reason]}</p>
+                  </div>
+                  <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                    r.status === "actioned" ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                  }`}>
+                    {r.status === "actioned" ? "Actioned" : "Dismissed"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+/* ====== SUSPEND/BAN TAB ====== */
+const SuspendBanTab = () => {
+  const [users, setUsers] = useState(mockAdminUsers);
+  const [actionModal, setActionModal] = useState<{ user: AdminUser; action: "suspend" | "ban" } | null>(null);
+  const [reason, setReason] = useState("");
+
+  const handleAction = () => {
+    if (!actionModal || !reason.trim()) return;
+    setUsers((prev) =>
+      prev.map((u) =>
+        u.id === actionModal.user.id
+          ? { ...u, status: actionModal.action === "suspend" ? "suspended" as const : "banned" as const }
+          : u
+      )
+    );
+    setActionModal(null);
+    setReason("");
+  };
+
+  const handleRestore = (userId: string) => {
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "active" as const } : u));
+  };
+
+  return (
+    <div>
+      <div className="space-y-2">
+        {users.map((u) => (
+          <div key={u.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+            <img src={u.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-foreground">{u.displayName}</p>
+              <p className="text-xs text-muted-foreground">@{u.username}</p>
+            </div>
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusBadge[u.status].className}`}>
+              {statusBadge[u.status].label}
+            </span>
+            {u.status === "active" ? (
+              <div className="flex gap-1.5">
+                <button onClick={() => setActionModal({ user: u, action: "suspend" })}
+                  className="px-3 py-1.5 rounded-lg bg-yellow-500/10 text-yellow-600 text-xs font-semibold hover:bg-yellow-500/20 transition-colors flex items-center gap-1"
+                >
+                  <Clock size={12} /> Suspend
+                </button>
+                <button onClick={() => setActionModal({ user: u, action: "ban" })}
+                  className="px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-semibold hover:bg-destructive/20 transition-colors flex items-center gap-1"
+                >
+                  <Ban size={12} /> Ban
+                </button>
+              </div>
+            ) : (
+              <button onClick={() => handleRestore(u.id)}
+                className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-600 text-xs font-semibold hover:bg-green-500/20 transition-colors"
+              >
+                Restore
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Action modal with reason */}
+      <Dialog open={!!actionModal} onOpenChange={() => { setActionModal(null); setReason(""); }}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {actionModal?.action === "suspend" ? "Suspend User" : "Ban User"}
+            </DialogTitle>
+            <DialogDescription>
+              {actionModal?.action === "suspend"
+                ? `Temporarily suspend ${actionModal?.user.displayName}'s account.`
+                : `Permanently ban ${actionModal?.user.displayName} from the platform.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Reason (required)</label>
+              <textarea
+                value={reason} onChange={(e) => setReason(e.target.value)}
+                placeholder="Explain why this action is being taken..."
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            </div>
+            <button onClick={handleAction} disabled={!reason.trim()}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-opacity disabled:opacity-40 ${
+                actionModal?.action === "ban"
+                  ? "bg-destructive text-destructive-foreground hover:opacity-90"
+                  : "bg-yellow-500 text-white hover:opacity-90"
+              }`}
+            >
+              {actionModal?.action === "suspend" ? "Suspend User" : "Ban User"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
+/* ====== BRANDING TAB ====== */
+const BrandingTab = () => {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setPreview(loadStoredFavicon());
+  }, []);
+
+  const onFile = async (file?: File | null) => {
+    if (!file) return;
+    setBusy(true);
+    try {
+      const dataUrl = await generateFaviconFromFile(file);
+      setPreview(dataUrl);
+      toast({ title: "Favicon updated", description: "The site icon has been regenerated and applied." });
+    } catch (e) {
+      toast({
+        title: "Couldn't update favicon",
+        description: e instanceof Error ? e.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  };
+
+  const onReset = () => {
+    clearFavicon();
+    setPreview(null);
+    toast({ title: "Favicon reset", description: "Reverted to the default site icon." });
+  };
+
+  return (
+    <div className="max-w-xl">
+      <h2 className="font-display text-lg font-semibold text-foreground mb-1">Site Favicon</h2>
+      <p className="text-sm text-muted-foreground mb-6">
+        Upload an image to regenerate the favicon. It's center-cropped to a square and resized to 256×256.
+      </p>
+
+      <div className="bg-card border border-border rounded-2xl p-6">
+        <div className="flex items-center gap-5 mb-5">
+          <div className="w-20 h-20 rounded-xl bg-muted border border-border overflow-hidden flex items-center justify-center">
+            <img
+              src={preview ?? "/favicon.png"}
+              alt="Current favicon"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-foreground">Current icon</p>
+            <p className="text-xs text-muted-foreground">
+              {preview ? "Custom favicon (saved on this device)" : "Default favicon"}
+            </p>
+          </div>
+        </div>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          className="hidden"
+          onChange={(e) => onFile(e.target.files?.[0])}
+        />
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => inputRef.current?.click()}
+            disabled={busy}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+          >
+            <Upload size={16} />
+            {busy ? "Processing..." : "Upload image"}
+          </button>
+          <button
+            onClick={onReset}
+            disabled={busy || !preview}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold hover:bg-secondary/80 transition-colors disabled:opacity-40"
+          >
+            <RotateCcw size={16} /> Reset to default
+          </button>
+        </div>
+
+        <p className="text-xs text-muted-foreground mt-4">
+          Note: changes apply to your browser. Persisting the favicon for all visitors requires backend storage.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default Admin;
