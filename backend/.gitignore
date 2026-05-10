@@ -1,0 +1,9 @@
+# 1. Secrets and environment variables
+.env
+
+# 2. Virtual environment
+venv/
+
+# 3. Python cache and compiled files
+**/__pycache__/
+*.pyc
