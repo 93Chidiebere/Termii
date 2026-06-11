@@ -61,14 +61,12 @@ async def create_post(
         created_at=post.created_at.isoformat(),
     )
 
-
-# ── GET /posts — fetch all posts (feed) ───────────────────────────────────────
+# ── GET /posts — fetch all posts (feed) — public ──────────────────────────────
 @router.get("/", response_model=List[PostResponse])
-async def get_posts(current_user: User = Depends(get_current_user)):
+async def get_posts():
     posts = await Post.find_all().to_list()
     result = []
     for post in posts:
-        # Fetch the linked user document
         await post.fetch_link(Post.user)
         user = post.user
         result.append(PostResponse(

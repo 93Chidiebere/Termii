@@ -238,7 +238,7 @@ const Messages = () => {
                             {conv.participant_name}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(conv.last_timestamp), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(conv.last_timestamp + "Z"), { addSuffix: true })}
                           </span>
                         </div>
                         <p className="text-sm text-muted-foreground truncate">{conv.last_message}</p>
@@ -378,7 +378,7 @@ const Messages = () => {
                         }`}>
                           <p>{msg.text}</p>
                           <p className={`text-[10px] mt-1 ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                            {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(msg.timestamp + "Z"), { addSuffix: true })}
                           </p>
                         </div>
                       </div>
