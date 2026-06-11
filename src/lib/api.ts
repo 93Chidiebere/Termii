@@ -42,6 +42,19 @@ export const getMe = async () => {
   return response.data;
 };
 
+export interface ApiUser {
+  id: string;
+  email: string;
+  full_name: string;
+  hair_type?: string;
+  avatar_url?: string;
+}
+
+export const searchUsers = async (query: string): Promise<ApiUser[]> => {
+  const response = await apiClient.get(`/auth/users/search?q=${encodeURIComponent(query)}`);
+  return response.data;
+};
+
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
 export const createPost = async (data: {
@@ -130,7 +143,6 @@ export const getMessageHistory = async (partnerId: string): Promise<ApiMessage[]
   return response.data;
 };
 
-// Creates an authenticated WebSocket connection
 export const createChatSocket = (token: string): WebSocket => {
   const wsUrl = `wss://termii-production.up.railway.app/chat/ws?token=${token}`;
   return new WebSocket(wsUrl);
