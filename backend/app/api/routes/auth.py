@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
+from typing import List
 from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
 from app.services.auth import get_password_hash, verify_password, create_access_token
@@ -59,3 +60,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.get("/me", response_model=UserResponse)
 async def get_me(current_user: User = Depends(get_current_user)):
     return UserResponse.from_mongo(current_user)
+
+
+# ── GET /auth/users/search ────────────────────────────────────────────────────
+@router.get("/users/search", response_model=List[UserResponse])
+async def search_users(
+    q: str = Query(..., min_length=1),
+    current_user: User = Depends(get_current_user),
+):
+    # Find users whose name or email contains the search term (case-insensitive)
+    all_users = await User.find_all().to_list()
+    q_lower = q.lower()
+    results = [
+        u for u in all_users
+        if (q_lower in u.full_name.lower() or q_lower in u.email.lower())
+        and str(u.id) != str(current_user.id)  # exclude self
+    ]
+    return [UserResponse.from_mongo(u) for u in results[:10]]  # max 10 results
