@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Settings, Grid3X3, Bookmark, Camera } from "lucide-react";
+import { Settings, Grid3X3, Bookmark, Camera, LogOut } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { users, posts } from "@/data/mockData";
-import { Link } from "react-router-dom";
+import { posts } from "@/data/mockData";
+import { Link, useNavigate } from "react-router-dom";
 import { useSavedStore } from "@/stores/savedStore";
+import { useAuthStore } from "@/stores/authStore";
 import {
   Dialog,
   DialogContent,
@@ -15,27 +16,73 @@ import {
 
 const hairTypes = ["3A", "3B", "3C", "4A", "4B", "4C"];
 
+// A simple placeholder avatar using the user's initials when no photo exists
+const InitialsAvatar = ({ name }: { name: string }) => {
+  const initials = name
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return (
+    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-primary/20 flex items-center justify-center ring-2 ring-primary/30">
+      <span className="text-2xl font-bold text-primary">{initials}</span>
+    </div>
+  );
+};
+
 const Profile = () => {
+  const navigate = useNavigate();
+  const { user, logout } = useAuthStore();
+  const { savedIds } = useSavedStore();
+
+  // Derive display values from the real logged-in user
+  // The auth store saves `name` from the email prefix — fall back gracefully
+  const realName = user?.displayName || user?.name || user?.email?.split("@")[0] || "User";
+  const realUsername = user?.username || user?.email?.split("@")[0] || "user";
+  const realBio = user?.bio || "";
+  const realAvatar = user?.avatar || "";
+  const realHairType = user?.hairType || "";
+
   const [tab, setTab] = useState<"posts" | "saved">("posts");
   const [editOpen, setEditOpen] = useState(false);
 
-  // Editable profile state
-  const [displayName, setDisplayName] = useState(users[0].displayName);
-  const [bio, setBio] = useState(users[0].bio);
-  const [username, setUsername] = useState(users[0].username);
-  const [hairType, setHairType] = useState("4C");
-  const [avatar, setAvatar] = useState(users[0].avatar);
+  // Editable fields — start from real user values
+  const [displayName, setDisplayName] = useState(realName);
+  const [bio, setBio] = useState(realBio);
+  const [username, setUsername] = useState(realUsername);
+  const [hairType, setHairType] = useState(realHairType);
+  const [avatar, setAvatar] = useState(realAvatar);
 
-  const userPosts = posts.filter((p) => p.userId === users[0].id);
-  const { savedIds } = useSavedStore();
+  // For now posts still come from mock data filtered by user id
+  // In Fix #3 part 2 these will come from the real API
+  const userPosts = posts.filter((p) => p.userId === user?.id);
   const savedPosts = savedIds
     .map((id) => posts.find((p) => p.id === id))
     .filter((p): p is (typeof posts)[number] => Boolean(p));
   const visiblePosts = tab === "posts" ? userPosts : savedPosts;
 
   const handleSave = () => {
-    // In a real app this would call the API
+    // Update the zustand store so changes reflect everywhere instantly
+    useAuthStore.setState((state) => ({
+      user: state.user
+        ? {
+            ...state.user,
+            displayName,
+            name: displayName,
+            username,
+            bio,
+            hairType,
+            avatar,
+          }
+        : null,
+    }));
     setEditOpen(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
   };
 
   return (
@@ -43,30 +90,68 @@ const Profile = () => {
       <div className="max-w-2xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="flex items-start gap-6 mb-6">
-          <img
-            src={avatar}
-            alt={displayName}
-            className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-3 ring-gold/40"
-          />
+          {/* Avatar — show initials if no photo */}
+          {avatar ? (
+            <img
+              src={avatar}
+              alt={displayName}
+              className="w-20 h-20 sm:w-24 sm:h-24 rounded-full object-cover ring-2 ring-primary/30"
+            />
+          ) : (
+            <InitialsAvatar name={displayName} />
+          )}
+
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-2">
-              <h1 className="font-display text-xl font-bold text-foreground">{displayName}</h1>
-              <button onClick={() => setEditOpen(true)} className="p-1.5 rounded-lg hover:bg-muted transition-colors">
+              <h1 className="font-display text-xl font-bold text-foreground">
+                {displayName}
+              </h1>
+              <button
+                onClick={() => setEditOpen(true)}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+              >
                 <Settings size={18} className="text-muted-foreground" />
+              </button>
+              {/* Logout button */}
+              <button
+                onClick={handleLogout}
+                className="p-1.5 rounded-lg hover:bg-muted transition-colors ml-auto"
+                title="Log out"
+              >
+                <LogOut size={18} className="text-muted-foreground" />
               </button>
             </div>
             <p className="text-sm text-muted-foreground mb-1">@{username}</p>
-            <p className="text-sm text-foreground mb-3">{bio}</p>
+            {bio && <p className="text-sm text-foreground mb-3">{bio}</p>}
+            {hairType && (
+              <span className="inline-block mb-3 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                {hairType} hair
+              </span>
+            )}
             <div className="flex gap-6 text-sm">
-              <div><span className="font-bold text-foreground">{users[0].posts}</span> <span className="text-muted-foreground">posts</span></div>
-              <div><span className="font-bold text-foreground">{users[0].followers.toLocaleString()}</span> <span className="text-muted-foreground">followers</span></div>
-              <div><span className="font-bold text-foreground">{users[0].following}</span> <span className="text-muted-foreground">following</span></div>
+              <div>
+                <span className="font-bold text-foreground">{userPosts.length}</span>{" "}
+                <span className="text-muted-foreground">posts</span>
+              </div>
+              <div>
+                <span className="font-bold text-foreground">
+                  {user?.followers?.toLocaleString() ?? 0}
+                </span>{" "}
+                <span className="text-muted-foreground">followers</span>
+              </div>
+              <div>
+                <span className="font-bold text-foreground">{user?.following ?? 0}</span>{" "}
+                <span className="text-muted-foreground">following</span>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Edit Profile Button (mobile) */}
-        <button onClick={() => setEditOpen(true)} className="w-full mb-4 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card transition-colors sm:hidden">
+        <button
+          onClick={() => setEditOpen(true)}
+          className="w-full mb-4 py-2 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-card transition-colors sm:hidden"
+        >
           Edit Profile
         </button>
 
@@ -75,7 +160,9 @@ const Profile = () => {
           <button
             onClick={() => setTab("posts")}
             className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === "posts" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+              tab === "posts"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground"
             }`}
           >
             <Grid3X3 size={16} /> Posts
@@ -83,19 +170,21 @@ const Profile = () => {
           <button
             onClick={() => setTab("saved")}
             className={`flex items-center gap-2 px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-              tab === "saved" ? "border-primary text-foreground" : "border-transparent text-muted-foreground"
+              tab === "saved"
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground"
             }`}
           >
             <Bookmark size={16} /> Saved
           </button>
         </div>
 
-        {/* Grid */}
+        {/* Post Grid */}
         {visiblePosts.length === 0 ? (
           <div className="text-center py-16 text-sm text-muted-foreground">
             {tab === "saved"
               ? "No saved posts yet. Tap the bookmark on any post to save it."
-              : "No posts yet."}
+              : "No posts yet. Share your first hair photo!"}
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-1.5">
@@ -137,10 +226,18 @@ const Profile = () => {
           </DialogHeader>
 
           <div className="space-y-5 mt-2">
-            {/* Avatar */}
+            {/* Avatar upload */}
             <div className="flex justify-center">
               <label className="relative cursor-pointer">
-                <img src={avatar} alt="" className="w-20 h-20 rounded-full object-cover ring-2 ring-border" />
+                {avatar ? (
+                  <img
+                    src={avatar}
+                    alt=""
+                    className="w-20 h-20 rounded-full object-cover ring-2 ring-border"
+                  />
+                ) : (
+                  <InitialsAvatar name={displayName} />
+                )}
                 <span className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center">
                   <Camera size={14} />
                 </span>
@@ -160,7 +257,9 @@ const Profile = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Display Name</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Display Name
+              </label>
               <input
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
@@ -169,7 +268,9 @@ const Profile = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Username</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Username
+              </label>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
@@ -183,12 +284,15 @@ const Profile = () => {
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
                 rows={3}
+                placeholder="Tell the community about your hair journey..."
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Hair Type</label>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Hair Type
+              </label>
               <div className="grid grid-cols-6 gap-2">
                 {hairTypes.map((type) => (
                   <button

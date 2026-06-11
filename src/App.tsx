@@ -21,6 +21,7 @@ import Marketplace from "./pages/Marketplace";
 import ProductDetail from "./pages/ProductDetail";
 import NotFound from "./pages/NotFound";
 import { SplashScreen } from "./components/SplashScreen";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -32,22 +33,51 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          {/* Public routes — anyone can visit these */}
           <Route path="/" element={<Landing />} />
-          <Route path="/feed" element={<Index />} />
-          <Route path="/explore" element={<Explore />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/post/:id" element={<PostDetail />} />
           <Route path="/login" element={<Login />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/activity" element={<Activity />} />
-          <Route path="/create" element={<Create />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/admin" element={<Admin />} />
-          <Route path="/hair-twins" element={<HairTwins />} />
-          <Route path="/hair-twins/:id" element={<HairTwinDetail />} />
-          <Route path="/marketplace" element={<Marketplace />} />
-          <Route path="/product/:id" element={<ProductDetail />} />
+
+          {/* Protected routes — must be logged in */}
+          <Route path="/feed" element={
+            <ProtectedRoute><Index /></ProtectedRoute>
+          } />
+          <Route path="/explore" element={
+            <ProtectedRoute><Explore /></ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute><Profile /></ProtectedRoute>
+          } />
+          <Route path="/post/:id" element={
+            <ProtectedRoute><PostDetail /></ProtectedRoute>
+          } />
+          <Route path="/activity" element={
+            <ProtectedRoute><Activity /></ProtectedRoute>
+          } />
+          <Route path="/create" element={
+            <ProtectedRoute><Create /></ProtectedRoute>
+          } />
+          <Route path="/messages" element={
+            <ProtectedRoute><Messages /></ProtectedRoute>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute><Admin /></ProtectedRoute>
+          } />
+          <Route path="/hair-twins" element={
+            <ProtectedRoute><HairTwins /></ProtectedRoute>
+          } />
+          <Route path="/hair-twins/:id" element={
+            <ProtectedRoute><HairTwinDetail /></ProtectedRoute>
+          } />
+          <Route path="/marketplace" element={
+            <ProtectedRoute><Marketplace /></ProtectedRoute>
+          } />
+          <Route path="/product/:id" element={
+            <ProtectedRoute><ProductDetail /></ProtectedRoute>
+          } />
+
+          {/* 404 — catch everything else */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

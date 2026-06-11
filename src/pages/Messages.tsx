@@ -1,20 +1,123 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Send, MoreVertical, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Send, ShieldAlert, Loader2, MessageCircle } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { conversations, Conversation, Message } from "@/data/mockMessages";
 import { formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/stores/authStore";
+import {
+  getConversations,
+  getMessageHistory,
+  createChatSocket,
+  type ApiConversation,
+  type ApiMessage,
+} from "@/lib/api";
 
 const Messages = () => {
-  const { isMinor } = useAuthStore();
-  const [activeConv, setActiveConv] = useState<Conversation | null>(null);
+  const { isMinor, user, token } = useAuthStore();
+  const currentUserId = user?.id || "";
+
+  const [conversations, setConversations] = useState<ApiConversation[]>([]);
+  const [activeConv, setActiveConv] = useState<ApiConversation | null>(null);
+  const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
-  const [localConversations, setLocalConversations] = useState(conversations);
+  const [isLoadingConvs, setIsLoadingConvs] = useState(true);
+  const [isLoadingMsgs, setIsLoadingMsgs] = useState(false);
 
-  const currentUserId = "1";
+  const socketRef = useRef<WebSocket | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
+  // ── Scroll to bottom whenever messages change ──────────────────────────────
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── Connect WebSocket on mount ─────────────────────────────────────────────
+  useEffect(() => {
+    if (!token) return;
+
+    const socket = createChatSocket(token);
+    socketRef.current = socket;
+
+    socket.onmessage = (event) => {
+      try {
+        const incoming: ApiMessage = JSON.parse(event.data);
+        // Only add to current chat if it belongs to the active conversation
+        setMessages((prev) => {
+          const alreadyExists = prev.some((m) => m.id === incoming.id);
+          if (alreadyExists) return prev;
+          return [...prev, incoming];
+        });
+        // Update conversation list last message
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.participant_id === incoming.sender_id ||
+            c.participant_id === incoming.receiver_id
+              ? { ...c, last_message: incoming.text, last_timestamp: incoming.timestamp }
+              : c
+          )
+        );
+      } catch {
+        // ignore malformed messages
+      }
+    };
+
+    socket.onerror = () => {
+      // WebSocket failed — app still works, just no real-time
+    };
+
+    return () => {
+      socket.close();
+    };
+  }, [token]);
+
+  // ── Fetch conversations on mount ───────────────────────────────────────────
+  useEffect(() => {
+    const load = async () => {
+      setIsLoadingConvs(true);
+      try {
+        const data = await getConversations();
+        setConversations(data);
+      } catch {
+        // No conversations yet — empty state
+      } finally {
+        setIsLoadingConvs(false);
+      }
+    };
+    load();
+  }, []);
+
+  // ── Open a conversation ────────────────────────────────────────────────────
+  const handleOpenConv = async (conv: ApiConversation) => {
+    setActiveConv(conv);
+    setIsLoadingMsgs(true);
+    try {
+      const history = await getMessageHistory(conv.participant_id);
+      setMessages(history);
+    } catch {
+      setMessages([]);
+    } finally {
+      setIsLoadingMsgs(false);
+    }
+  };
+
+  // ── Send a message ─────────────────────────────────────────────────────────
+  const handleSend = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMessage.trim() || !activeConv || !socketRef.current) return;
+
+    const socket = socketRef.current;
+    if (socket.readyState !== WebSocket.OPEN) return;
+
+    socket.send(JSON.stringify({
+      receiver_id: activeConv.participant_id,
+      text: newMessage.trim(),
+    }));
+
+    setNewMessage("");
+  };
+
+  // ── Age restriction gate ───────────────────────────────────────────────────
   if (isMinor) {
     return (
       <AppLayout>
@@ -34,116 +137,148 @@ const Messages = () => {
     );
   }
 
-  const handleSend = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newMessage.trim() || !activeConv) return;
-
-    const msg: Message = {
-      id: `m-${Date.now()}`,
-      senderId: currentUserId,
-      text: newMessage.trim(),
-      timestamp: new Date().toISOString(),
-      read: true,
-    };
-
-    setLocalConversations((prev) =>
-      prev.map((c) =>
-        c.id === activeConv.id
-          ? { ...c, messages: [...c.messages, msg], lastMessage: msg.text, lastTimestamp: msg.timestamp }
-          : c
-      )
-    );
-    setActiveConv((prev) =>
-      prev ? { ...prev, messages: [...prev.messages, msg], lastMessage: msg.text, lastTimestamp: msg.timestamp } : prev
-    );
-    setNewMessage("");
-  };
-
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto h-[calc(100vh-5rem)] md:h-screen flex flex-col">
         <AnimatePresence mode="wait">
-          {!activeConv ? (
-            /* CONVERSATION LIST */
-            <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full">
+
+          {/* ── CONVERSATION LIST ─────────────────────────────────────── */}
+          {!activeConv && (
+            <motion.div
+              key="list"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col h-full"
+            >
               <div className="px-4 py-5 border-b border-border">
                 <h1 className="font-display text-2xl font-bold text-foreground">Messages</h1>
               </div>
-              <div className="flex-1 overflow-y-auto">
-                {localConversations.length === 0 ? (
-                  <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-                    No conversations yet
+
+              {isLoadingConvs ? (
+                <div className="flex items-center justify-center flex-1">
+                  <Loader2 size={28} className="animate-spin text-primary" />
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center px-8">
+                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                    <MessageCircle size={28} className="text-muted-foreground" />
                   </div>
-                ) : (
-                  localConversations.map((conv) => (
+                  <p className="font-semibold text-foreground">No conversations yet</p>
+                  <p className="text-sm text-muted-foreground">
+                    When you message someone, it will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto">
+                  {conversations.map((conv) => (
                     <button
-                      key={conv.id}
-                      onClick={() => setActiveConv(conv)}
+                      key={conv.participant_id}
+                      onClick={() => handleOpenConv(conv)}
                       className="w-full flex items-center gap-3 px-4 py-4 hover:bg-card transition-colors border-b border-border text-left"
                     >
-                      <img src={conv.participant.avatar} alt="" className="w-12 h-12 rounded-full object-cover" />
+                      {/* Initials avatar for real users */}
+                      <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                        <span className="text-base font-bold text-primary">
+                          {conv.participant_name[0].toUpperCase()}
+                        </span>
+                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-sm text-foreground">{conv.participant.displayName}</span>
+                          <span className="font-semibold text-sm text-foreground">
+                            {conv.participant_name}
+                          </span>
                           <span className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(conv.lastTimestamp), { addSuffix: true })}
+                            {formatDistanceToNow(new Date(conv.last_timestamp), { addSuffix: true })}
                           </span>
                         </div>
-                        <p className="text-sm text-muted-foreground truncate">{conv.lastMessage}</p>
+                        <p className="text-sm text-muted-foreground truncate">
+                          {conv.last_message}
+                        </p>
                       </div>
-                      {conv.unreadCount > 0 && (
+                      {conv.unread_count > 0 && (
                         <span className="w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center font-bold">
-                          {conv.unreadCount}
+                          {conv.unread_count}
                         </span>
                       )}
                     </button>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </motion.div>
-          ) : (
-            /* CHAT VIEW */
-            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col h-full">
-              {/* Chat header */}
+          )}
+
+          {/* ── CHAT VIEW ────────────────────────────────────────────── */}
+          {activeConv && (
+            <motion.div
+              key="chat"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col h-full"
+            >
+              {/* Header */}
               <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-                <button onClick={() => setActiveConv(null)} className="text-muted-foreground hover:text-foreground">
+                <button
+                  onClick={() => { setActiveConv(null); setMessages([]); }}
+                  className="text-muted-foreground hover:text-foreground"
+                >
                   <ArrowLeft size={22} />
                 </button>
-                <img src={activeConv.participant.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
-                <div className="flex-1">
-                  <p className="font-semibold text-sm text-foreground">{activeConv.participant.displayName}</p>
-                  <p className="text-xs text-muted-foreground">@{activeConv.participant.username}</p>
+                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary">
+                    {activeConv.participant_name[0].toUpperCase()}
+                  </span>
                 </div>
-                <button className="text-muted-foreground hover:text-foreground">
-                  <MoreVertical size={20} />
-                </button>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm text-foreground">
+                    {activeConv.participant_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {activeConv.participant_email}
+                  </p>
+                </div>
               </div>
 
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-                {activeConv.messages.map((msg) => {
-                  const isMe = msg.senderId === currentUserId;
-                  return (
-                    <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm ${
-                          isMe
-                            ? "bg-primary text-primary-foreground rounded-br-md"
-                            : "bg-card border border-border text-foreground rounded-bl-md"
-                        }`}
-                      >
-                        <p>{msg.text}</p>
-                        <p className={`text-[10px] mt-1 ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
-                          {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true })}
-                        </p>
+                {isLoadingMsgs ? (
+                  <div className="flex items-center justify-center h-full">
+                    <Loader2 size={24} className="animate-spin text-primary" />
+                  </div>
+                ) : messages.length === 0 ? (
+                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                    No messages yet. Say hello! 👋
+                  </div>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe = msg.sender_id === currentUserId;
+                    return (
+                      <div key={msg.id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm ${
+                            isMe
+                              ? "bg-primary text-primary-foreground rounded-br-md"
+                              : "bg-card border border-border text-foreground rounded-bl-md"
+                          }`}
+                        >
+                          <p>{msg.text}</p>
+                          <p className={`text-[10px] mt-1 ${isMe ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                            {formatDistanceToNow(new Date(msg.timestamp), { addSuffix: true })}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
               </div>
 
               {/* Input */}
-              <form onSubmit={handleSend} className="px-4 py-3 border-t border-border flex items-center gap-2">
+              <form
+                onSubmit={handleSend}
+                className="px-4 py-3 border-t border-border flex items-center gap-2"
+              >
                 <input
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}

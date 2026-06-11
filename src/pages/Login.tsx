@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, ArrowLeft, Check, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
-import { hairCategories } from "@/data/mockData";
 
 const hairTypes = ["3A", "3B", "3C", "4A", "4B", "4C"];
 const interests = [
@@ -11,9 +10,7 @@ const interests = [
   "Afros", "Locs", "Silk Press", "Bantu Knots", "Hair Growth Tips",
   "Product Reviews", "Heat-Free Styling", "Coloring Natural Hair",
 ];
-
 const countries = [
-  // African countries
   "Algeria", "Angola", "Benin", "Botswana", "Burkina Faso", "Burundi",
   "Cabo Verde", "Cameroon", "Central African Republic", "Chad", "Comoros",
   "Congo (Brazzaville)", "Congo (DRC)", "Côte d'Ivoire", "Djibouti", "Egypt",
@@ -23,14 +20,21 @@ const countries = [
   "Mozambique", "Namibia", "Niger", "Nigeria", "Rwanda", "São Tomé and Príncipe",
   "Senegal", "Seychelles", "Sierra Leone", "Somalia", "South Africa", "South Sudan",
   "Sudan", "Tanzania", "Togo", "Tunisia", "Uganda", "Zambia", "Zimbabwe",
-  // Other regions
   "United Kingdom", "United States", "Europe", "Asia", "Other",
 ];
 
 const Login = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { login, signup, signupStep, setSignupStep, signupData, updateSignupData, resetSignup } = useAuthStore();
+  const location = useLocation();
+
+  // Where the user was trying to go before being sent to login
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/feed";
+
+  const {
+    login, signup, signupStep, setSignupStep, signupData,
+    updateSignupData, resetSignup, isLoading, error, clearError,
+  } = useAuthStore();
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(searchParams.get("signup") === "true");
@@ -46,23 +50,23 @@ const Login = () => {
     if (searchParams.get("signup") === "true") setIsSignUp(true);
   }, [searchParams]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // Clear errors when user starts typing
+  useEffect(() => {
+    if (error) clearError();
+  }, [email, password]);
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    login(email, password);
-    navigate("/feed");
+    await login(email, password);
+    const state = useAuthStore.getState();
+    if (state.isAuthenticated && !state.error) {
+      navigate(from, { replace: true });
+    }
   };
 
   const handleSignupNext = (e: React.FormEvent) => {
     e.preventDefault();
-    updateSignupData({
-      email,
-      password,
-      displayName,
-      username,
-      country,
-      province,
-      isMinor: !is16Plus,
-    });
+    updateSignupData({ email, password, displayName, username, country, province, isMinor: !is16Plus });
     setSignupStep(1);
   };
 
@@ -79,14 +83,18 @@ const Login = () => {
     updateSignupData({ interests: updated });
   };
 
-  const handleFinishSignup = () => {
-    signup();
-    navigate("/feed");
+  const handleFinishSignup = async () => {
+    await signup();
+    const state = useAuthStore.getState();
+    if (state.isAuthenticated && !state.error) {
+      navigate("/feed", { replace: true });
+    }
   };
 
   const switchMode = () => {
     setIsSignUp(!isSignUp);
     resetSignup();
+    clearError();
   };
 
   return (
@@ -103,106 +111,117 @@ const Login = () => {
 
         <div className="bg-card border border-border rounded-2xl p-8">
           <AnimatePresence mode="wait">
-            {/* LOGIN */}
+
+            {/* ── LOGIN ─────────────────────────────────────── */}
             {!isSignUp && (
               <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-6 text-center">Welcome Back</h2>
+
+                {error && (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
                 <form className="space-y-4" onSubmit={handleLogin}>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                    <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                    <input
+                      type="email" placeholder="your@email.com" value={email} required
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
                     <div className="relative">
-                      <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 pr-10" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <input
+                        type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} required
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 pr-10"
+                      />
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                   </div>
                   <div className="flex justify-end">
-                    <Link to="/forgot-password" className="text-xs text-primary hover:underline">
-                      Forgot Password?
-                    </Link>
+                    <Link to="/forgot-password" className="text-xs text-primary hover:underline">Forgot Password?</Link>
                   </div>
-                  <button type="submit" className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity">
-                    Sign In
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {isLoading
+                      ? <><Loader2 size={16} className="animate-spin" /> Signing in...</>
+                      : "Sign In"
+                    }
                   </button>
                 </form>
               </motion.div>
             )}
 
-            {/* SIGNUP STEP 0: Credentials */}
+            {/* ── SIGNUP STEP 0 ──────────────────────────────── */}
             {isSignUp && signupStep === 0 && (
               <motion.div key="signup-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-6 text-center">Join the Community</h2>
+
+                {error && (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
                 <form className="space-y-4" onSubmit={handleSignupNext}>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Display Name</label>
-                    <input type="text" placeholder="Your name" value={displayName} onChange={(e) => setDisplayName(e.target.value)}
+                    <input type="text" placeholder="Your name" value={displayName} required
+                      onChange={(e) => setDisplayName(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Username</label>
-                    <input type="text" placeholder="@username" value={username} onChange={(e) => setUsername(e.target.value)}
+                    <input type="text" placeholder="@username" value={username} required
+                      onChange={(e) => setUsername(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-                    <input type="email" placeholder="your@email.com" value={email} onChange={(e) => setEmail(e.target.value)}
+                    <input type="email" placeholder="your@email.com" value={email} required
+                      onChange={(e) => setEmail(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
                     <div className="relative">
-                      <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)}
+                      <input type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} required
+                        onChange={(e) => setPassword(e.target.value)}
                         className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 pr-10" />
-                      <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                      <button type="button" onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                       </button>
                     </div>
                   </div>
-
-                  {/* Country */}
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Country</label>
-                    <select
-                      value={country}
-                      onChange={(e) => setCountry(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    >
+                    <select value={country} onChange={(e) => setCountry(e.target.value)} required
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
                       <option value="">Select your country</option>
-                      {countries.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
+                      {countries.map((c) => <option key={c} value={c}>{c}</option>)}
                     </select>
                   </div>
-
-                  {/* Province / State */}
                   <div>
                     <label className="block text-sm font-medium text-foreground mb-1.5">Province / State</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Enugu, Nairobi, Kampala"
-                      value={province}
+                    <input type="text" placeholder="e.g. Enugu, Nairobi, Kampala" value={province} required
                       onChange={(e) => setProvince(e.target.value)}
-                      required
-                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
+                      className="w-full px-4 py-3 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
-
-                  {/* Age Confirmation */}
                   <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={is16Plus}
-                      onChange={(e) => setIs16Plus(e.target.checked)}
-                      className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/30"
-                    />
+                    <input type="checkbox" checked={is16Plus} onChange={(e) => setIs16Plus(e.target.checked)}
+                      className="mt-0.5 w-4 h-4 rounded border-border text-primary focus:ring-primary/30" />
                     <span className="text-sm text-foreground leading-snug">
                       I confirm that I am <strong>16 years or older</strong>
                     </span>
@@ -212,15 +231,15 @@ const Login = () => {
                       Under 16? You can still join but won't have access to Marketplace or Messages.
                     </p>
                   )}
-
-                  <button type="submit" className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2">
-                    Continue <ArrowRight size={16} />
+                  <button type="submit" disabled={isLoading}
+                    className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                    {isLoading ? <><Loader2 size={16} className="animate-spin" /> Please wait...</> : <>Continue <ArrowRight size={16} /></>}
                   </button>
                 </form>
               </motion.div>
             )}
 
-            {/* SIGNUP STEP 1: Hair Type */}
+            {/* ── SIGNUP STEP 1: Hair Type ───────────────────── */}
             {isSignUp && signupStep === 1 && (
               <motion.div key="signup-1" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <button onClick={() => setSignupStep(0)} className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 text-sm">
@@ -230,15 +249,12 @@ const Login = () => {
                 <p className="text-sm text-muted-foreground text-center mb-6">This helps us personalize your feed</p>
                 <div className="grid grid-cols-3 gap-3">
                   {hairTypes.map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => handleSelectHairType(type)}
+                    <button key={type} onClick={() => handleSelectHairType(type)}
                       className={`py-4 rounded-xl border text-center font-semibold text-sm transition-all ${
                         signupData.hairType === type
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border text-foreground hover:border-primary/40"
-                      }`}
-                    >
+                      }`}>
                       {type}
                     </button>
                   ))}
@@ -249,7 +265,7 @@ const Login = () => {
               </motion.div>
             )}
 
-            {/* SIGNUP STEP 2: Interests */}
+            {/* ── SIGNUP STEP 2: Interests ───────────────────── */}
             {isSignUp && signupStep === 2 && (
               <motion.div key="signup-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <button onClick={() => setSignupStep(1)} className="text-muted-foreground hover:text-foreground mb-4 flex items-center gap-1 text-sm">
@@ -261,32 +277,34 @@ const Login = () => {
                   {interests.map((interest) => {
                     const selected = signupData.interests?.includes(interest);
                     return (
-                      <button
-                        key={interest}
-                        onClick={() => handleToggleInterest(interest)}
+                      <button key={interest} onClick={() => handleToggleInterest(interest)}
                         className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1 ${
-                          selected
-                            ? "bg-primary text-primary-foreground"
-                            : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-                        }`}
-                      >
+                          selected ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                        }`}>
                         {selected && <Check size={14} />}
                         {interest}
                       </button>
                     );
                   })}
                 </div>
-                <button
-                  onClick={handleFinishSignup}
-                  className="w-full mt-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-                >
-                  Start Exploring
+
+                {error && (
+                  <div className="mt-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">
+                    {error}
+                  </div>
+                )}
+
+                <button onClick={handleFinishSignup} disabled={isLoading}
+                  className="w-full mt-6 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+                  {isLoading
+                    ? <><Loader2 size={16} className="animate-spin" /> Creating account...</>
+                    : "Start Exploring"
+                  }
                 </button>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Toggle login/signup */}
           {(signupStep === 0 || !isSignUp) && (
             <div className="mt-6 text-center">
               <p className="text-sm text-muted-foreground">

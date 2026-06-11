@@ -1,5 +1,5 @@
-import { NavLink, useLocation } from "react-router-dom";
-import { Home, Search, PlusSquare, Bell, User, MessageCircle, Shield, Users, ShoppingBag } from "lucide-react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { Home, Search, PlusSquare, Bell, User, MessageCircle, Shield, Users, ShoppingBag, LogOut } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useRoleStore } from "@/stores/roleStore";
 
@@ -16,9 +16,18 @@ const navItems = [
 
 export const DesktopSidebar = () => {
   const location = useLocation();
-  const { user, isAuthenticated } = useAuthStore();
+  const navigate = useNavigate();
+  const { user, isAuthenticated, logout } = useAuthStore();
   const { hasRole } = useRoleStore();
   const isAdmin = isAuthenticated && user && hasRole(user.id, "admin");
+
+  const displayName = user?.displayName || user?.name || user?.email?.split("@")[0] || "Profile";
+  const userEmail = user?.email || "";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/login");
+  };
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-warm-brown flex-col z-50">
@@ -60,13 +69,41 @@ export const DesktopSidebar = () => {
         )}
       </nav>
 
+      {/* Bottom section — changes based on auth state */}
       <div className="p-4 border-t border-sidebar-border">
-        <NavLink
-          to="/login"
-          className="flex items-center justify-center px-4 py-2.5 rounded-lg bg-gold text-gold-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
-        >
-          Sign In
-        </NavLink>
+        {isAuthenticated ? (
+          // Logged in — show user info and logout button
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+              {user?.avatar ? (
+                <img src={user.avatar} alt={displayName} className="w-9 h-9 rounded-full object-cover" />
+              ) : (
+                <span className="text-sm font-bold text-primary">
+                  {displayName[0].toUpperCase()}
+                </span>
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-sidebar-foreground truncate">{displayName}</p>
+              <p className="text-xs text-sidebar-foreground/50 truncate">{userEmail}</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              title="Log out"
+              className="p-1.5 rounded-lg hover:bg-sidebar-accent transition-colors flex-shrink-0"
+            >
+              <LogOut size={18} className="text-sidebar-foreground/60" />
+            </button>
+          </div>
+        ) : (
+          // Logged out — show Sign In button
+          <NavLink
+            to="/login"
+            className="flex items-center justify-center px-4 py-2.5 rounded-lg bg-gold text-gold-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+          >
+            Sign In
+          </NavLink>
+        )}
       </div>
     </aside>
   );
