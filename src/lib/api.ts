@@ -55,6 +55,23 @@ export const searchUsers = async (query: string): Promise<ApiUser[]> => {
   return response.data;
 };
 
+// ── Hair Twins ────────────────────────────────────────────────────────────────
+
+export interface ApiTwin {
+  user_id: string;
+  email: string;
+  full_name: string;
+  avatar_url?: string;
+  hair_type?: string;
+  match_score: number;
+  shared_traits: string[];
+}
+
+export const getTwins = async (): Promise<ApiTwin[]> => {
+  const response = await apiClient.get("/twins/");
+  return response.data;
+};
+
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
 export const createPost = async (data: {

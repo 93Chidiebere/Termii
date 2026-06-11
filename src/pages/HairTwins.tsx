@@ -1,21 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Users, ChevronDown, ChevronUp, MapPin, UserPlus, UserCheck } from "lucide-react";
+import { Users, ChevronDown, ChevronUp, UserPlus, UserCheck, Loader2 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { hairTwins } from "@/data/mockHairTwins";
 import { useFollowStore } from "@/stores/followStore";
+import { getTwins, type ApiTwin } from "@/lib/api";
+import { useAuthStore } from "@/stores/authStore";
 
 const MatchCircle = ({ score }: { score: number }) => {
   const percentage = Math.round(score * 100);
   const circumference = 2 * Math.PI * 54;
   const strokeDashoffset = circumference - (score * circumference);
-
   return (
     <div className="relative w-32 h-32 mx-auto">
       <svg className="w-32 h-32 -rotate-90" viewBox="0 0 120 120">
@@ -37,11 +36,11 @@ const MatchCircle = ({ score }: { score: number }) => {
   );
 };
 
-const TwinCard = ({ twin, index }: { twin: typeof hairTwins[0]; index: number }) => {
+const TwinCard = ({ twin, index }: { twin: ApiTwin; index: number }) => {
   const navigate = useNavigate();
   const { isFollowing, toggleFollow } = useFollowStore();
-  const following = isFollowing(twin.userId);
-  const percentage = Math.round(twin.matchScore * 100);
+  const following = isFollowing(twin.user_id);
+  const percentage = Math.round(twin.match_score * 100);
 
   return (
     <motion.div
@@ -49,24 +48,29 @@ const TwinCard = ({ twin, index }: { twin: typeof hairTwins[0]; index: number })
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.08 }}
     >
-      <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
-        onClick={() => navigate(`/hair-twins/${twin.userId}`)}
+      <Card
+        className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer"
+        onClick={() => navigate(`/hair-twins/${twin.user_id}`)}
       >
         <CardContent className="p-4">
           <div className="flex items-start gap-3">
             <Avatar className="h-14 w-14 ring-2 ring-gold/30">
-              <AvatarImage src={twin.avatar} alt={twin.displayName} />
-              <AvatarFallback>{twin.displayName[0]}</AvatarFallback>
+              {twin.avatar_url ? (
+                <img src={twin.avatar_url} alt={twin.full_name} className="h-full w-full object-cover rounded-full" />
+              ) : (
+                <AvatarFallback className="bg-primary/20 text-primary font-bold text-lg">
+                  {twin.full_name[0].toUpperCase()}
+                </AvatarFallback>
+              )}
             </Avatar>
 
             <div className="flex-1 min-w-0">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-semibold text-foreground">{twin.displayName}</h3>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <MapPin size={12} />
-                    <span>{twin.location}</span>
-                  </div>
+                  <h3 className="font-semibold text-foreground">{twin.full_name}</h3>
+                  <p className="text-xs text-muted-foreground">
+                    {twin.hair_type ? `${twin.hair_type} hair` : "Natural hair"}
+                  </p>
                 </div>
                 <div className="flex flex-col items-end gap-1">
                   <span className="text-lg font-bold text-gold font-display">{percentage}%</span>
@@ -75,7 +79,7 @@ const TwinCard = ({ twin, index }: { twin: typeof hairTwins[0]; index: number })
               </div>
 
               <div className="flex flex-wrap gap-1 mt-2">
-                {twin.sharedTraits.map((trait) => (
+                {twin.shared_traits.map((trait) => (
                   <Badge key={trait} variant="secondary" className="text-[10px] px-1.5 py-0">
                     {trait}
                   </Badge>
@@ -87,15 +91,18 @@ const TwinCard = ({ twin, index }: { twin: typeof hairTwins[0]; index: number })
                   size="sm"
                   variant={following ? "secondary" : "default"}
                   className="h-8 text-xs flex-1"
-                  onClick={(e) => { e.stopPropagation(); toggleFollow(twin.userId); }}
+                  onClick={(e) => { e.stopPropagation(); toggleFollow(twin.user_id); }}
                 >
-                  {following ? <><UserCheck size={14} /> Following</> : <><UserPlus size={14} /> Follow</>}
+                  {following
+                    ? <><UserCheck size={14} className="mr-1" /> Following</>
+                    : <><UserPlus size={14} className="mr-1" /> Follow</>
+                  }
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
                   className="h-8 text-xs flex-1"
-                  onClick={(e) => { e.stopPropagation(); navigate(`/hair-twins/${twin.userId}`); }}
+                  onClick={(e) => { e.stopPropagation(); navigate(`/hair-twins/${twin.user_id}`); }}
                 >
                   View Profile
                 </Button>
@@ -109,9 +116,32 @@ const TwinCard = ({ twin, index }: { twin: typeof hairTwins[0]; index: number })
 };
 
 const HairTwins = () => {
+  const { user } = useAuthStore();
   const [showAll, setShowAll] = useState(false);
-  const avgScore = hairTwins.reduce((sum, t) => sum + t.matchScore, 0) / hairTwins.length;
-  const visibleTwins = showAll ? hairTwins : hairTwins.slice(0, 5);
+  const [twins, setTwins] = useState<ApiTwin[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      setIsLoading(true);
+      try {
+        const data = await getTwins();
+        setTwins(data);
+        setError(null);
+      } catch {
+        setError("Could not load hair twins.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    load();
+  }, []);
+
+  const visibleTwins = showAll ? twins : twins.slice(0, 5);
+  const avgScore = twins.length > 0
+    ? twins.reduce((sum, t) => sum + t.match_score, 0) / twins.length
+    : 0;
 
   return (
     <AppLayout>
@@ -127,46 +157,87 @@ const HairTwins = () => {
             <h1 className="text-3xl font-display font-bold text-foreground">Your Hair Twins</h1>
           </div>
           <p className="text-sm text-muted-foreground max-w-md mx-auto">
-            We matched you with people who have similar hair to yours — same texture, porosity, and goals.
+            We matched you with people who have similar hair to yours.
             Learn from each other's journeys! 💛
           </p>
+          {user?.hairType && (
+            <p className="text-xs text-primary font-semibold mt-2">
+              Matching based on your {user.hairType} hair type
+            </p>
+          )}
         </motion.div>
 
-        {/* Match Strength */}
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="mb-8"
-        >
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 size={32} className="animate-spin text-primary" />
+          </div>
+        )}
+
+        {/* No hair type set */}
+        {!isLoading && !error && twins.length === 0 && (
           <Card>
-            <CardContent className="py-6">
-              <MatchCircle score={avgScore} />
-              <p className="text-center text-xs text-muted-foreground mt-2">
-                Average match strength across your top twins
+            <CardContent className="py-12 text-center">
+              <p className="font-semibold text-foreground mb-2">No twins found yet</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                {user?.hairType
+                  ? "No other users with your hair type have joined yet. Check back soon!"
+                  : "Set your hair type in your profile to find your hair twins."}
               </p>
+              {!user?.hairType && (
+                <Button onClick={() => window.location.href = "/profile"} size="sm">
+                  Update Profile
+                </Button>
+              )}
             </CardContent>
           </Card>
-        </motion.div>
+        )}
 
-        {/* Twins List */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-display font-semibold text-foreground">
-            Top Matches
-          </h2>
-          {visibleTwins.map((twin, i) => (
-            <TwinCard key={twin.userId} twin={twin} index={i} />
-          ))}
-        </div>
+        {/* Match circle + twins list */}
+        {!isLoading && twins.length > 0 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-8"
+            >
+              <Card>
+                <CardContent className="py-6">
+                  <MatchCircle score={avgScore} />
+                  <p className="text-center text-xs text-muted-foreground mt-2">
+                    Average match strength across your top twins
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
 
-        {hairTwins.length > 5 && (
-          <Button
-            variant="ghost"
-            className="w-full mt-4 text-muted-foreground"
-            onClick={() => setShowAll(!showAll)}
-          >
-            {showAll ? <><ChevronUp size={16} /> Show Less</> : <><ChevronDown size={16} /> Show {hairTwins.length - 5} More</>}
-          </Button>
+            <div className="space-y-3">
+              <h2 className="text-lg font-display font-semibold text-foreground">
+                Top Matches ({twins.length} found)
+              </h2>
+              {visibleTwins.map((twin, i) => (
+                <TwinCard key={twin.user_id} twin={twin} index={i} />
+              ))}
+            </div>
+
+            {twins.length > 5 && (
+              <Button
+                variant="ghost"
+                className="w-full mt-4 text-muted-foreground"
+                onClick={() => setShowAll(!showAll)}
+              >
+                {showAll
+                  ? <><ChevronUp size={16} className="mr-1" /> Show Less</>
+                  : <><ChevronDown size={16} className="mr-1" /> Show {twins.length - 5} More</>
+                }
+              </Button>
+            )}
+          </>
+        )}
+
+        {error && (
+          <div className="text-center py-8 text-sm text-muted-foreground">{error}</div>
         )}
       </div>
     </AppLayout>
