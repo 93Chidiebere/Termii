@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { Post, User } from "@/data/mockData";
 
-const BASE_URL = "http://localhost:8000";
+const BASE_URL = "https://termii-production.up.railway.app";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,
@@ -132,6 +132,6 @@ export const getMessageHistory = async (partnerId: string): Promise<ApiMessage[]
 
 // Creates an authenticated WebSocket connection
 export const createChatSocket = (token: string): WebSocket => {
-  const wsUrl = `ws://localhost:8000/chat/ws?token=${token}`;
+  const wsUrl = `wss://termii-production.up.railway.app/chat/ws?token=${token}`;
   return new WebSocket(wsUrl);
 };
