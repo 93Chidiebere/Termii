@@ -86,6 +86,25 @@ const ProductCard = ({ product, onClick }: { product: Product; onClick: () => vo
 );
 
 // ── List Product Modal ────────────────────────────────────────────────────────
+const CLOUDINARY_CLOUD = "dwfojbv0m";
+const CLOUDINARY_PRESET = "jxuvhapr";
+
+const uploadToCloudinary = async (file: File): Promise<string> => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("upload_preset", CLOUDINARY_PRESET);
+  formData.append("folder", "termii/products");
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`,
+    { method: "POST", body: formData }
+  );
+
+  if (!response.ok) throw new Error("Image upload failed");
+  const data = await response.json();
+  return data.secure_url;
+};
+
 const ListProductModal = ({
   onClose,
   onSuccess,
@@ -99,24 +118,74 @@ const ListProductModal = ({
   const [category, setCategory] = useState("Other");
   const [deliveryLocation, setDeliveryLocation] = useState("");
   const [tags, setTags] = useState("");
+  const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState("");
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Max 4 images
+    const combined = [...imageFiles, ...files].slice(0, 4);
+    setImageFiles(combined);
+
+    // Generate previews
+    combined.forEach((file, i) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviews((prev) => {
+          const updated = [...prev];
+          updated[i] = reader.result as string;
+          return updated.slice(0, 4);
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index: number) => {
+    setImageFiles((prev) => prev.filter((_, i) => i !== index));
+    setImagePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!title.trim() || !price || !description.trim()) {
       toast.error("Please fill in all required fields.");
       return;
     }
+
+    const parsedPrice = parseFloat(price.replace(/,/g, ""));
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      toast.error("Please enter a valid price.");
+      return;
+    }
+
     setIsSubmitting(true);
+
     try {
+      // Step 1 — Upload all images to Cloudinary
+      let mediaUrls: string[] = [];
+      if (imageFiles.length > 0) {
+        setUploadProgress(`Uploading ${imageFiles.length} image(s)...`);
+        mediaUrls = await Promise.all(imageFiles.map(uploadToCloudinary));
+        setUploadProgress("Saving product...");
+      }
+
+      // Step 2 — Create product in backend
       const result = await createProduct({
         title: title.trim(),
         description: description.trim(),
-        price: parseFloat(price),
+        price: parsedPrice,
         category,
         delivery_location: deliveryLocation.trim(),
         tags: tags.split(",").map((t) => t.trim().replace(/^#/, "")).filter(Boolean),
+        media_urls: mediaUrls,
       });
+
       onSuccess(transformApiProduct(result));
       toast.success("Product listed successfully! 🎉");
       onClose();
@@ -124,6 +193,7 @@ const ListProductModal = ({
       toast.error("Failed to list product. Please try again.");
     } finally {
       setIsSubmitting(false);
+      setUploadProgress("");
     }
   };
 
@@ -142,6 +212,40 @@ const ListProductModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+
+          {/* Image Upload */}
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Product Images <span className="text-muted-foreground">(up to 4)</span>
+            </label>
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              {imagePreviews.map((src, i) => (
+                <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                  <img src={src} alt="" className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="absolute top-1 right-1 w-5 h-5 rounded-full bg-background/80 flex items-center justify-center"
+                  >
+                    <X size={10} className="text-foreground" />
+                  </button>
+                </div>
+              ))}
+              {imagePreviews.length < 4 && (
+                <label className="aspect-square rounded-lg border-2 border-dashed border-border flex items-center justify-center cursor-pointer hover:border-primary/40 transition-colors bg-muted/30">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleImageSelect}
+                  />
+                  <Plus size={20} className="text-muted-foreground" />
+                </label>
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Product Name *</label>
             <input value={title} onChange={(e) => setTitle(e.target.value)} required
@@ -183,182 +287,27 @@ const ListProductModal = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Tags (optional)</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Tags <span className="text-muted-foreground">(optional)</span>
+            </label>
             <input value={tags} onChange={(e) => setTags(e.target.value)}
               placeholder="#shea-butter, #organic, #4C"
               className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
           </div>
 
+          {uploadProgress && (
+            <p className="text-sm text-primary text-center animate-pulse">{uploadProgress}</p>
+          )}
+
           <button type="submit" disabled={isSubmitting}
             className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
-            {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Listing...</> : "List Product"}
+            {isSubmitting
+              ? <><Loader2 size={16} className="animate-spin" /> {uploadProgress || "Listing..."}</>
+              : "List Product"
+            }
           </button>
         </form>
       </motion.div>
     </div>
   );
 };
-
-// ── Main Marketplace Page ─────────────────────────────────────────────────────
-const Marketplace = () => {
-  const navigate = useNavigate();
-  const { isMinor } = useAuthStore();
-  const [search, setSearch] = useState("");
-  const [activeCategory, setActiveCategory] = useState("All");
-  const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [showListModal, setShowListModal] = useState(false);
-  const [realProducts, setRealProducts] = useState<Product[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const load = async () => {
-      setIsLoading(true);
-      try {
-        const data = await getProducts();
-        setRealProducts(data.map(transformApiProduct));
-      } catch {
-        // Fall back to mock products
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    load();
-  }, []);
-
-  // Merge real products first, then mock products
-  const realIds = new Set(realProducts.map((p) => p.id));
-  const allProducts = [
-    ...realProducts,
-    ...mockProducts.filter((p) => !realIds.has(p.id)),
-  ];
-
-  const filtered = allProducts.filter((p) => {
-    const matchSearch =
-      !search ||
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.seller.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()));
-    const matchCategory = activeCategory === "All" || p.category === activeCategory;
-    const matchSection =
-      !activeSection ||
-      (activeSection === "trending" && p.isTrending) ||
-      (activeSection === "new" && p.isNew) ||
-      (activeSection === "near" && true) ||
-      (activeSection === "twins" && p.fromHairTwin);
-    return matchSearch && matchCategory && matchSection;
-  });
-
-  const handleNewProduct = (product: Product) => {
-    setRealProducts((prev) => [product, ...prev]);
-  };
-
-  if (isMinor) {
-    return (
-      <AppLayout>
-        <div className="max-w-md mx-auto px-4 py-20 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert size={32} className="text-muted-foreground" />
-          </div>
-          <h1 className="font-display text-xl font-bold text-foreground mb-2">Access Restricted</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            The Marketplace is only available to members aged 16 and above.
-          </p>
-          <Link to="/feed" className="text-sm text-primary font-semibold hover:underline">← Back to Feed</Link>
-        </div>
-      </AppLayout>
-    );
-  }
-
-  return (
-    <AppLayout>
-      <div className="max-w-2xl mx-auto px-4 py-4 pb-24 md:pb-8">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <ShoppingBag size={24} className="text-primary" />
-            <h1 className="text-xl font-display font-bold text-foreground">Marketplace</h1>
-          </div>
-          <button
-            onClick={() => setShowListModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-          >
-            <Plus size={16} /> Sell
-          </button>
-        </div>
-
-        {/* Search */}
-        <div className="relative mb-4">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search products, sellers..." value={search}
-            onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-        </div>
-
-        {/* Category Chips */}
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-hide">
-          {categories.map((cat) => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
-              className={`whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                activeCategory === cat
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent"
-              }`}>
-              {cat}
-            </button>
-          ))}
-        </div>
-
-        {/* Section Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-hide">
-          {sectionFilters.map(({ key, label, icon: Icon }) => (
-            <button key={key} onClick={() => setActiveSection(activeSection === key ? null : key)}
-              className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                activeSection === key
-                  ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/50"
-              }`}>
-              <Icon size={13} />
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {/* Loading */}
-        {isLoading && (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 size={28} className="animate-spin text-primary" />
-          </div>
-        )}
-
-        {/* Products Grid */}
-        {!isLoading && (
-          filtered.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3">
-              {filtered.map((product) => (
-                <ProductCard key={product.id} product={product}
-                  onClick={() => navigate(`/product/${product.id}`)} />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 text-muted-foreground">
-              <ShoppingBag size={40} className="mx-auto mb-3 opacity-40" />
-              <p className="font-medium">No products found</p>
-              <p className="text-sm mt-1">Try a different search or category</p>
-            </div>
-          )
-        )}
-      </div>
-
-      {/* List Product Modal */}
-      <AnimatePresence>
-        {showListModal && (
-          <ListProductModal
-            onClose={() => setShowListModal(false)}
-            onSuccess={handleNewProduct}
-          />
-        )}
-      </AnimatePresence>
-    </AppLayout>
-  );
-};
-
-export default Marketplace;
