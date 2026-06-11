@@ -164,3 +164,52 @@ export const createChatSocket = (token: string): WebSocket => {
   const wsUrl = `wss://termii-production.up.railway.app/chat/ws?token=${token}`;
   return new WebSocket(wsUrl);
 };
+
+// ── Marketplace ───────────────────────────────────────────────────────────────
+
+export interface ApiSeller {
+  id: string;
+  name: string;
+  avatar: string;
+  rating: number;
+  completed_orders: number;
+  location: string;
+}
+
+export interface ApiProduct {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  currency: string;
+  quantity: number;
+  category: string;
+  delivery_location: string;
+  media_urls: string[];
+  tags: string[];
+  is_trending: boolean;
+  is_new: boolean;
+  status: string;
+  seller: ApiSeller;
+  created_at: string;
+}
+
+export const getProducts = async (): Promise<ApiProduct[]> => {
+  const response = await apiClient.get("/shop/");
+  return response.data;
+};
+
+export const createProduct = async (data: {
+  title: string;
+  description: string;
+  price: number;
+  currency?: string;
+  quantity?: number;
+  category?: string;
+  delivery_location?: string;
+  media_urls?: string[];
+  tags?: string[];
+}): Promise<ApiProduct> => {
+  const response = await apiClient.post("/shop/", data);
+  return response.data;
+};

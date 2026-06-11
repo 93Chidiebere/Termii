@@ -1,17 +1,41 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 class ProductCreate(BaseModel):
     title: str
     description: str
     price: float
-    quantity: int
-    delivery_location: str
+    currency: str = "₦"
+    quantity: int = 1
+    category: str = "Other"
+    delivery_location: str = ""
     media_urls: List[str] = []
+    tags: List[str] = []
 
-class ProductResponse(ProductCreate):
+class SellerInfo(BaseModel):
     id: str
-    seller_id: str
+    name: str
+    avatar: str = ""
+    rating: float = 5.0
+    completed_orders: int = 0
+    location: str = ""
+
+class ProductResponse(BaseModel):
+    id: str
+    title: str
+    description: str
+    price: float
+    currency: str
+    quantity: int
+    category: str
+    delivery_location: str
+    media_urls: List[str]
+    tags: List[str]
+    is_trending: bool
+    is_new: bool
     status: str
-    created_at: datetime
+    seller: SellerInfo
+    created_at: str
+
+    model_config = {"from_attributes": True}

@@ -9,10 +9,15 @@ class Product(Document):
     title: Indexed(str)
     description: str
     price: float
-    quantity: int
-    delivery_location: str
+    currency: str = "₦"
+    quantity: int = 1
+    category: str = "Other"
+    delivery_location: str = ""
     media_urls: List[str] = []
-    status: Indexed(str) = "PENDING" # PENDING, APPROVED, REJECTED
+    tags: List[str] = []
+    is_trending: bool = False
+    is_new: bool = True
+    status: Indexed(str) = "PENDING"
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
