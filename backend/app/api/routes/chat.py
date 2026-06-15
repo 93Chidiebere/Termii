@@ -33,20 +33,20 @@ class ConversationSummary(BaseModel):
 # ── GET /chat/conversations — list all conversations for current user ──────────
 @router.get("/conversations", response_model=List[ConversationSummary])
 async def get_conversations(current_user: User = Depends(get_current_user)):
-    # Find all messages where current user is sender or receiver
+    from beanie.operators import Or
     messages = await Message.find(
-        (Message.sender.id == current_user.id) |  # type: ignore
-        (Message.receiver.id == current_user.id)  # type: ignore
+        Or(
+            Message.sender.id == current_user.id,  # type: ignore
+            Message.receiver.id == current_user.id  # type: ignore
+        )
     ).sort(-Message.created_at).to_list()
 
-    # Group by conversation partner
     conv_map: dict = {}
     for msg in messages:
         await msg.fetch_all_links()
         sender = msg.sender
         receiver = msg.receiver
 
-        # Figure out who the other person is
         if hasattr(sender, "id") and str(sender.id) == str(current_user.id):
             partner = receiver
         else:
@@ -65,7 +65,6 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
                 "last_timestamp": msg.created_at.isoformat(),
                 "unread_count": 0,
             }
-        # Count unread messages sent TO current user
         if (
             hasattr(receiver, "id")
             and str(receiver.id) == str(current_user.id)
@@ -82,17 +81,22 @@ async def get_history(
     partner_id: str,
     current_user: User = Depends(get_current_user),
 ):
+    from beanie.operators import Or, And
+
     partner = await User.get(partner_id)
     if not partner:
         raise HTTPException(status_code=404, detail="User not found")
 
     messages = await Message.find(
-        (
-            (Message.sender.id == current_user.id) &   # type: ignore
-            (Message.receiver.id == partner.id)         # type: ignore
-        ) | (
-            (Message.sender.id == partner.id) &         # type: ignore
-            (Message.receiver.id == current_user.id)    # type: ignore
+        Or(
+            And(
+                Message.sender.id == current_user.id,  # type: ignore
+                Message.receiver.id == partner.id  # type: ignore
+            ),
+            And(
+                Message.sender.id == partner.id,  # type: ignore
+                Message.receiver.id == current_user.id  # type: ignore
+            )
         )
     ).sort(Message.created_at).to_list()
 
