@@ -14,6 +14,7 @@ import {
   type ApiMessage,
   type ApiUser,
 } from "@/lib/api";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 const Messages = () => {
   const { isMinor, user, token } = useAuthStore();
@@ -47,6 +48,7 @@ const Messages = () => {
     const socket = createChatSocket(token);
     socketRef.current = socket;
 
+
     socket.onmessage = (event) => {
       try {
         const incoming: ApiMessage = JSON.parse(event.data);
@@ -63,8 +65,17 @@ const Messages = () => {
               : c
           )
         );
+        // Only notify if the message is FROM someone else (not our own echo)
+        if (incoming.sender_id !== currentUserId) {
+         useNotificationStore.getState().addNotification({
+          type: "message",
+          title: incoming.sender_name,
+          text: `sent you a message: "${incoming.text.slice(0, 40)}${incoming.text.length > 40 ? "..." : ""}"`,
+          link: "/messages",
+         });
+        }
       } catch {
-        // ignore malformed messages
+      // ignore malformed messages
       }
     };
 

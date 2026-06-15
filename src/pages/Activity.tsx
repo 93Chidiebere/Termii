@@ -1,34 +1,8 @@
-import { useState } from "react";
-import { Heart, MessageCircle, UserPlus, AtSign, Share2 } from "lucide-react";
+import { Heart, MessageCircle, UserPlus, AtSign, Share2, Bell } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { users } from "@/data/mockData";
-
-type NotificationType = "like" | "comment" | "follow" | "mention" | "share";
-
-interface Notification {
-  id: string;
-  type: NotificationType;
-  user: typeof users[0];
-  text: string;
-  time: string;
-  read: boolean;
-  link: string;
-}
-
-const notifications: Notification[] = [
-  { id: "n1", type: "like", user: users[1], text: "liked your twist-out post", time: "2m ago", read: false, link: "/post/1" },
-  { id: "n2", type: "comment", user: users[1], text: 'commented: "Love this style! 😍"', time: "15m ago", read: false, link: "/post/1" },
-  { id: "n3", type: "follow", user: users[1], text: "started following you", time: "1h ago", read: false, link: "/profile" },
-  { id: "n4", type: "mention", user: users[1], text: "mentioned you in a comment", time: "2h ago", read: true, link: "/post/2" },
-  { id: "n5", type: "share", user: users[1], text: "shared your low bun post", time: "3h ago", read: true, link: "/post/3" },
-  { id: "n6", type: "like", user: users[1], text: "liked your bun with fringe post", time: "5h ago", read: true, link: "/post/4" },
-  { id: "n7", type: "comment", user: users[1], text: 'commented: "What products did you use?"', time: "6h ago", read: true, link: "/post/3" },
-  { id: "n8", type: "follow", user: users[0], text: "started following you", time: "1d ago", read: true, link: "/profile" },
-  { id: "n9", type: "share", user: users[1], text: "shared your wash day post", time: "1d ago", read: true, link: "/post/6" },
-  { id: "n10", type: "mention", user: users[0], text: "mentioned you in a post", time: "2d ago", read: true, link: "/post/8" },
-];
+import { useNotificationStore, type NotificationType, type AppNotification } from "@/stores/notificationStore";
 
 const iconMap: Record<NotificationType, React.ReactNode> = {
   like: <Heart size={16} className="text-terracotta" />,
@@ -36,6 +10,7 @@ const iconMap: Record<NotificationType, React.ReactNode> = {
   follow: <UserPlus size={16} className="text-gold" />,
   mention: <AtSign size={16} className="text-accent-foreground" />,
   share: <Share2 size={16} className="text-muted-foreground" />,
+  message: <MessageCircle size={16} className="text-primary" />,
 };
 
 const bgMap: Record<NotificationType, string> = {
@@ -44,36 +19,17 @@ const bgMap: Record<NotificationType, string> = {
   follow: "bg-gold/10",
   mention: "bg-accent",
   share: "bg-muted",
+  message: "bg-primary/10",
 };
-
-type FilterTab = "all" | NotificationType;
-
-const tabs: { value: FilterTab; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "like", label: "Likes" },
-  { value: "comment", label: "Comments" },
-  { value: "follow", label: "Follows" },
-  { value: "mention", label: "Mentions" },
-  { value: "share", label: "Shares" },
-];
 
 const Activity = () => {
   const navigate = useNavigate();
-  const [filter, setFilter] = useState<FilterTab>("all");
-  const [readIds, setReadIds] = useState<Set<string>>(
-    new Set(notifications.filter((n) => n.read).map((n) => n.id))
-  );
+  const { notifications, markRead, markAllRead, unreadCount } = useNotificationStore();
+  const count = unreadCount();
 
-  const filtered = filter === "all" ? notifications : notifications.filter((n) => n.type === filter);
-  const unreadCount = notifications.filter((n) => !readIds.has(n.id)).length;
-
-  const handleClick = (notif: Notification) => {
-    setReadIds((prev) => new Set(prev).add(notif.id));
-    navigate(notif.link);
-  };
-
-  const markAllRead = () => {
-    setReadIds(new Set(notifications.map((n) => n.id)));
+  const handleClick = (n: AppNotification) => {
+    markRead(n.id);
+    navigate(n.link);
   };
 
   return (
@@ -82,42 +38,30 @@ const Activity = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="font-display text-2xl font-bold text-foreground">Notifications</h1>
-            {unreadCount > 0 && (
-              <p className="text-xs text-muted-foreground mt-0.5">{unreadCount} unread</p>
+            {count > 0 && (
+              <p className="text-xs text-muted-foreground mt-0.5">{count} unread</p>
             )}
           </div>
-          {unreadCount > 0 && (
+          {count > 0 && (
             <button onClick={markAllRead} className="text-xs text-primary font-semibold hover:underline">
               Mark all read
             </button>
           )}
         </div>
 
-        {/* Filter tabs */}
-        <div className="flex gap-1.5 overflow-x-auto pb-3 mb-2 scrollbar-hide">
-          {tabs.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setFilter(tab.value)}
-              className={`px-3.5 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
-                filter === tab.value
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* List */}
-        <div className="space-y-0.5">
-          {filtered.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-12">No notifications yet</p>
-          )}
-          {filtered.map((n, i) => {
-            const isUnread = !readIds.has(n.id);
-            return (
+        {notifications.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <Bell size={28} className="text-muted-foreground" />
+            </div>
+            <p className="font-semibold text-foreground">No notifications yet</p>
+            <p className="text-sm text-muted-foreground">
+              When someone messages you or interacts with your posts, you'll see it here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-0.5">
+            {notifications.map((n, i) => (
               <motion.button
                 key={n.id}
                 initial={{ opacity: 0, x: -10 }}
@@ -125,33 +69,40 @@ const Activity = () => {
                 transition={{ delay: i * 0.04 }}
                 onClick={() => handleClick(n)}
                 className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${
-                  isUnread ? "bg-primary/5" : "hover:bg-card"
+                  !n.read ? "bg-primary/5" : "hover:bg-card"
                 }`}
               >
-                <div className="relative">
-                  <img
-                    src={n.user.avatar}
-                    alt={n.user.displayName}
-                    className="w-11 h-11 rounded-full object-cover"
-                  />
-                  {isUnread && (
+                {/* Avatar or initials */}
+                <div className="relative flex-shrink-0">
+                  {n.avatar ? (
+                    <img src={n.avatar} alt={n.title} className="w-11 h-11 rounded-full object-cover" />
+                  ) : (
+                    <div className="w-11 h-11 rounded-full bg-primary/20 flex items-center justify-center">
+                      <span className="text-sm font-bold text-primary">
+                        {n.title[0].toUpperCase()}
+                      </span>
+                    </div>
+                  )}
+                  {!n.read && (
                     <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full bg-primary border-2 border-background" />
                   )}
                 </div>
+
                 <div className="flex-1 min-w-0">
-                  <p className={`text-sm ${isUnread ? "text-foreground" : "text-foreground/80"}`}>
-                    <span className="font-semibold">{n.user.displayName}</span>{" "}
+                  <p className={`text-sm ${!n.read ? "text-foreground" : "text-foreground/80"}`}>
+                    <span className="font-semibold">{n.title}</span>{" "}
                     {n.text}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
                 </div>
+
                 <div className={`p-2 rounded-full shrink-0 ${bgMap[n.type]}`}>
                   {iconMap[n.type]}
                 </div>
               </motion.button>
-            );
-          })}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
     </AppLayout>
   );

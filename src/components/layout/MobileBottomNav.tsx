@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { Home, Search, ShoppingBag, PlusSquare, MessageCircle, Users, Bell, User } from "lucide-react";
+import { useNotificationStore } from "@/stores/notificationStore";
 
 const navItems = [
   { to: "/feed", icon: Home, label: "Home" },
@@ -14,12 +15,14 @@ const navItems = [
 
 export const MobileBottomNav = () => {
   const location = useLocation();
+  const notifCount = useNotificationStore((state) => state.unreadCount());
 
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border z-50">
       <div className="flex items-center justify-around py-2 px-1 overflow-x-auto scrollbar-hide">
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to;
+          const isNotif = to === "/activity";
           return (
             <NavLink
               key={to}
@@ -28,7 +31,14 @@ export const MobileBottomNav = () => {
                 isActive ? "text-primary" : "text-muted-foreground"
               }`}
             >
-              <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+              <div className="relative">
+                <Icon size={20} strokeWidth={isActive ? 2.5 : 1.5} />
+                {isNotif && notifCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {notifCount > 9 ? "9+" : notifCount}
+                  </span>
+                )}
+              </div>
               <span className="text-[9px] font-medium">{label}</span>
             </NavLink>
           );
