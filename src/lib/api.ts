@@ -97,6 +97,7 @@ interface ApiPost {
   created_at: string;
 }
 
+
 export const transformPost = (apiPost: ApiPost): Post => {
   const user: User = {
     id: apiPost.user_id,
@@ -116,17 +117,38 @@ export const transformPost = (apiPost: ApiPost): Post => {
     caption: apiPost.caption,
     hairType: apiPost.hair_type || "",
     tags: apiPost.tags || [],
-    likes: 0,
+    likes: (apiPost as any).likes_count ?? 0,
     comments: 0,
     createdAt: apiPost.created_at,
-    liked: false,
-    saved: false,
+    liked: (apiPost as any).is_liked ?? false,
+    saved: (apiPost as any).is_saved ?? false,
   };
 };
+
 
 export const getPosts = async (): Promise<Post[]> => {
   const response = await apiClient.get("/posts/");
   return (response.data as ApiPost[]).map(transformPost);
+};
+
+export const getMyPosts = async (): Promise<Post[]> => {
+  const response = await apiClient.get("/posts/my");
+  return (response.data as ApiPost[]).map(transformPost);
+};
+
+export const getSavedPosts = async (): Promise<Post[]> => {
+  const response = await apiClient.get("/posts/saved");
+  return (response.data as ApiPost[]).map(transformPost);
+};
+
+export const toggleLike = async (postId: string): Promise<{ liked: boolean; likes_count: number }> => {
+  const response = await apiClient.post(`/posts/${postId}/like`);
+  return response.data;
+};
+
+export const toggleSave = async (postId: string): Promise<{ saved: boolean; saves_count: number }> => {
+  const response = await apiClient.post(`/posts/${postId}/save`);
+  return response.data;
 };
 
 // ── Messages ──────────────────────────────────────────────────────────────────
