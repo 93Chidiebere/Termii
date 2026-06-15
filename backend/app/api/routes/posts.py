@@ -152,6 +152,19 @@ async def get_saved_posts(current_user: User = Depends(get_current_user)):
     return result
 
 
+# ── GET /posts/{id} — fetch single post ───────────────────────────────────────
+@router.get("/{post_id}", response_model=PostResponse)
+async def get_post(post_id: str):
+    post = await Post.get(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    await post.fetch_link(Post.user)
+    user = post.user
+    if not hasattr(user, "id"):
+        raise HTTPException(status_code=404, detail="Post user not found")
+    return await build_post_response(post, user, "")
+
+
 # ── POST /posts/{id}/like — toggle like ───────────────────────────────────────
 @router.post("/{post_id}/like")
 async def toggle_like(
@@ -178,18 +191,6 @@ async def toggle_like(
     likes_count = await PostLike.find(PostLike.post_id == post_id).count()
     return {"liked": liked, "likes_count": likes_count}
 
-
-# ── GET /posts/{id} — fetch single post ───────────────────────────────────────
-@router.get("/{post_id}", response_model=PostResponse)
-async def get_post(post_id: str):
-    post = await Post.get(post_id)
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-    await post.fetch_link(Post.user)
-    user = post.user
-    if not hasattr(user, "id"):
-        raise HTTPException(status_code=404, detail="Post user not found")
-    return await build_post_response(post, user, "")
 
 # ── POST /posts/{id}/save — toggle save ───────────────────────────────────────
 @router.post("/{post_id}/save")
