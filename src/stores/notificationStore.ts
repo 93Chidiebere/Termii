@@ -11,6 +11,10 @@ export interface AppNotification {
   read: boolean;
   link: string;
   avatar?: string;
+  // Extra fields for message notifications
+  senderId?: string;
+  senderName?: string;
+  senderEmail?: string;
 }
 
 interface NotificationState {

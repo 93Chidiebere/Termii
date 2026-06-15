@@ -28,8 +28,24 @@ const Activity = () => {
   const count = unreadCount();
 
   const handleClick = (n: AppNotification) => {
-    markRead(n.id);
+  markRead(n.id);
+  if (n.type === "message" && n.senderId) {
+    // Navigate to messages and auto-open the conversation
+    navigate("/messages", {
+      state: {
+        openConversation: {
+          participant_id: n.senderId,
+          participant_name: n.senderName || n.title,
+          participant_email: n.senderEmail || "",
+          last_message: "",
+          last_timestamp: new Date().toISOString(),
+          unread_count: 0,
+          },
+        },
+      });
+    } else {
     navigate(n.link);
+    }
   };
 
   return (

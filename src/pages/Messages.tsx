@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Send, ShieldAlert, Loader2, MessageCircle, Search, X, PenSquare } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -37,6 +37,18 @@ const Messages = () => {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const location = useLocation();
+
+  // Auto-open conversation if navigated from a notification
+  useEffect(() => {
+    const state = location.state as { openConversation?: ApiConversation } | null;
+    if (state?.openConversation) {
+      handleOpenConv(state.openConversation);
+      // Clear the state so back button works normally
+      window.history.replaceState({}, "");
+    }
+  }, []);
+
   // ── Scroll to bottom whenever messages change ──────────────────────────────
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -72,6 +84,9 @@ const Messages = () => {
           title: incoming.sender_name,
           text: `sent you a message: "${incoming.text.slice(0, 40)}${incoming.text.length > 40 ? "..." : ""}"`,
           link: "/messages",
+          senderId: incoming.sender_id,
+          senderName: incoming.sender_name,
+          senderEmail: "",
          });
         }
       } catch {
