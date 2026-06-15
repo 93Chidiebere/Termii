@@ -179,6 +179,18 @@ async def toggle_like(
     return {"liked": liked, "likes_count": likes_count}
 
 
+# ── GET /posts/{id} — fetch single post ───────────────────────────────────────
+@router.get("/{post_id}", response_model=PostResponse)
+async def get_post(post_id: str):
+    post = await Post.get(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    await post.fetch_link(Post.user)
+    user = post.user
+    if not hasattr(user, "id"):
+        raise HTTPException(status_code=404, detail="Post user not found")
+    return await build_post_response(post, user, "")
+
 # ── POST /posts/{id}/save — toggle save ───────────────────────────────────────
 @router.post("/{post_id}/save")
 async def toggle_save(

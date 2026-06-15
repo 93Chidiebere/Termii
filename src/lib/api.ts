@@ -141,6 +141,11 @@ export const getSavedPosts = async (): Promise<Post[]> => {
   return (response.data as ApiPost[]).map(transformPost);
 };
 
+export const getPostById = async (postId: string): Promise<Post> => {
+  const response = await apiClient.get(`/posts/${postId}`);
+  return transformPost(response.data);
+};
+
 export const toggleLike = async (postId: string): Promise<{ liked: boolean; likes_count: number }> => {
   const response = await apiClient.post(`/posts/${postId}/like`);
   return response.data;
