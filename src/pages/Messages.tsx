@@ -43,11 +43,12 @@ const Messages = () => {
   useEffect(() => {
     const state = location.state as { openConversation?: ApiConversation } | null;
     if (state?.openConversation) {
-      handleOpenConv(state.openConversation);
-      // Clear the state so back button works normally
-      window.history.replaceState({}, "");
+    // Use handleOpenConv to fetch message history properly
+    handleOpenConv(state.openConversation);
+    window.history.replaceState({}, "");
     }
-  }, []);
+  }, [location.state]);
+
 
   // ── Scroll to bottom whenever messages change ──────────────────────────────
   useEffect(() => {
