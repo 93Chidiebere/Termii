@@ -64,41 +64,50 @@ const Messages = () => {
 
     socket.onmessage = (event) => {
       try {
-        const incoming: ApiMessage = JSON.parse(event.data);
+        const incoming = JSON.parse(event.data);
+
+        // Handle notification payloads from backend
+        if (incoming.type === "notification") {
+          useNotificationStore.getState().addNotification({
+            type: incoming.notification_type,
+            title: incoming.title,
+            text: incoming.text,
+            link: incoming.link,
+            senderId: incoming.sender_id,
+            senderName: incoming.sender_name,
+          });
+        return;
+        }
+
+        // Handle chat messages
+        const msg = incoming as ApiMessage;
         setMessages((prev) => {
-          const alreadyExists = prev.some((m) => m.id === incoming.id);
+          const alreadyExists = prev.some((m) => m.id === msg.id);
           if (alreadyExists) return prev;
-          return [...prev, incoming];
+          return [...prev, msg];
         });
         setConversations((prev) =>
           prev.map((c) =>
-            c.participant_id === incoming.sender_id ||
-            c.participant_id === incoming.receiver_id
-              ? { ...c, last_message: incoming.text, last_timestamp: incoming.timestamp }
+            c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
+              ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
               : c
           )
         );
-        // Only notify if the message is FROM someone else (not our own echo)
-        if (incoming.sender_id !== currentUserId) {
-         useNotificationStore.getState().addNotification({
-          type: "message",
-          title: incoming.sender_name,
-          text: `sent you a message: "${incoming.text.slice(0, 40)}${incoming.text.length > 40 ? "..." : ""}"`,
-          link: "/messages",
-          senderId: incoming.sender_id,
-          senderName: incoming.sender_name,
-          senderEmail: "",
+        if (msg.sender_id !== currentUserId) {
+          useNotificationStore.getState().addNotification({
+            type: "message",
+            title: msg.sender_name,
+            text: `sent you a message: "${msg.text.slice(0, 40)}${msg.text.length > 40 ? "..." : ""}"`,
+            link: "/messages",
+            senderId: msg.sender_id,
+            senderName: msg.sender_name,
+            senderEmail: "",
          });
         }
       } catch {
-      // ignore malformed messages
+        // ignore malformed messages
       }
     };
-
-    socket.onerror = () => {};
-
-    return () => { socket.close(); };
-  }, [token]);
 
   // ── Fetch conversations on mount ───────────────────────────────────────────
   useEffect(() => {

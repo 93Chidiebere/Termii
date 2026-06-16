@@ -118,7 +118,7 @@ export const transformPost = (apiPost: ApiPost): Post => {
     hairType: apiPost.hair_type || "",
     tags: apiPost.tags || [],
     likes: (apiPost as any).likes_count ?? 0,
-    comments: 0,
+    comments: (apiPost as any).comments_count ?? 0,
     createdAt: apiPost.created_at,
     liked: (apiPost as any).is_liked ?? false,
     saved: (apiPost as any).is_saved ?? false,

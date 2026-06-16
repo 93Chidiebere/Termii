@@ -105,14 +105,7 @@ const PostDetail = () => {
       const result = await toggleLike(post.id);
       setLiked(result.liked);
       setLikeCount(result.likes_count);
-      if (result.liked && user?.id !== post.userId) {
-        addNotification({
-          type: "like",
-          title: user?.displayName || user?.name || "Someone",
-          text: "liked your post",
-          link: `/post/${post.id}`,
-        });
-      }
+
     } catch {
       setLiked(!newLiked);
       setLikeCount((c) => newLiked ? c - 1 : c + 1);
@@ -139,15 +132,7 @@ const PostDetail = () => {
       const newComment = await addComment(post.id, comment.trim());
       setComments((prev) => [...prev, newComment]);
       setComment("");
-      // Notify post owner
-      if (user?.id !== post.userId) {
-        addNotification({
-          type: "comment",
-          title: user?.displayName || user?.name || "Someone",
-          text: `commented: "${comment.trim().slice(0, 40)}${comment.length > 40 ? "..." : ""}"`,
-          link: `/post/${post.id}`,
-        });
-      }
+
     } catch {
       // silently fail
     } finally {
