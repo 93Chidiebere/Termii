@@ -1,23 +1,23 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Heart, MessageCircle, Bookmark, Share2, Send, MoreHorizontal, Loader2 } from "lucide-react";
+import {
+  ArrowLeft, Heart, MessageCircle, Bookmark,
+  Share2, Send, MoreHorizontal, Loader2,
+} from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { posts as mockPosts } from "@/data/mockData";
 import { useFollowStore } from "@/stores/followStore";
-import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuthStore } from "@/stores/authStore";
 import { useNotificationStore } from "@/stores/notificationStore";
-import { getPostById, toggleLike, toggleSave } from "@/lib/api";
+import {
+  getPostById, toggleLike, toggleSave,
+  getComments, addComment, type ApiComment,
+} from "@/lib/api";
 import type { Post } from "@/data/mockData";
-
-const mockComments = [
-  { id: "c1", username: "adabeauty", text: "Absolutely gorgeous! 😍", time: "2h ago" },
-  { id: "c2", username: "naturalqueen", text: "What products did you use?", time: "1h ago" },
-  { id: "c3", username: "hairlove", text: "Goals! 🔥👑", time: "45m ago" },
-];
+import { formatDistanceToNow } from "date-fns";
 
 const FollowButton = ({ userId }: { userId: string }) => {
   const { isFollowing, toggleFollow } = useFollowStore();
@@ -46,23 +46,23 @@ const PostDetail = () => {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
+  const [comments, setComments] = useState<ApiComment[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [comment, setComment] = useState("");
-  const [comments, setComments] = useState(mockComments);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
+  // Load post
   useEffect(() => {
     if (!id) return;
-
     const load = async () => {
       setIsLoading(true);
       try {
-        // Try real API first
         const realPost = await getPostById(id);
         setPost(realPost);
         setLiked(realPost.liked ?? false);
         setSaved(realPost.saved ?? false);
         setLikeCount(realPost.likes ?? 0);
       } catch {
-        // Fall back to mock data
         const mockPost = mockPosts.find((p) => p.id === id);
         if (mockPost) {
           setPost(mockPost);
@@ -76,8 +76,24 @@ const PostDetail = () => {
         setIsLoading(false);
       }
     };
-
     load();
+  }, [id]);
+
+  // Load comments
+  useEffect(() => {
+    if (!id) return;
+    const loadComments = async () => {
+      setIsLoadingComments(true);
+      try {
+        const data = await getComments(id);
+        setComments(data);
+      } catch {
+        setComments([]);
+      } finally {
+        setIsLoadingComments(false);
+      }
+    };
+    loadComments();
   }, [id]);
 
   const handleLike = async () => {
@@ -115,14 +131,28 @@ const PostDetail = () => {
     }
   };
 
-  const handleComment = (e: React.FormEvent) => {
+  const handleComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!comment.trim()) return;
-    setComments((prev) => [
-      ...prev,
-      { id: `c-${Date.now()}`, username: user?.username || "you", text: comment.trim(), time: "now" },
-    ]);
-    setComment("");
+    if (!comment.trim() || !post) return;
+    setIsSubmittingComment(true);
+    try {
+      const newComment = await addComment(post.id, comment.trim());
+      setComments((prev) => [...prev, newComment]);
+      setComment("");
+      // Notify post owner
+      if (user?.id !== post.userId) {
+        addNotification({
+          type: "comment",
+          title: user?.displayName || user?.name || "Someone",
+          text: `commented: "${comment.trim().slice(0, 40)}${comment.length > 40 ? "..." : ""}"`,
+          link: `/post/${post.id}`,
+        });
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   if (isLoading) {
@@ -247,15 +277,28 @@ const PostDetail = () => {
             </p>
 
             {/* Comments */}
-            <div className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-60">
-              {comments.map((c) => (
-                <div key={c.id}>
-                  <p className="text-sm text-foreground">
-                    <span className="font-semibold">{c.username}</span> {c.text}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{c.time}</p>
+            <div className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-64">
+              {isLoadingComments ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={18} className="animate-spin text-primary" />
                 </div>
-              ))}
+              ) : comments.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No comments yet. Be the first!
+                </p>
+              ) : (
+                comments.map((c) => (
+                  <div key={c.id}>
+                    <p className="text-sm text-foreground">
+                      <span className="font-semibold">{c.user_name}</span>{" "}
+                      {c.text}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
+                    </p>
+                  </div>
+                ))
+              )}
             </div>
 
             {/* Add comment */}
@@ -268,18 +311,26 @@ const PostDetail = () => {
                 placeholder="Add a comment..."
                 className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
               />
-              <button type="submit" disabled={!comment.trim()}
-                className="text-primary font-semibold text-sm disabled:opacity-40">
-                <Send size={18} />
+              <button
+                type="submit"
+                disabled={!comment.trim() || isSubmittingComment}
+                className="text-primary font-semibold text-sm disabled:opacity-40"
+              >
+                {isSubmittingComment
+                  ? <Loader2 size={16} className="animate-spin" />
+                  : <Send size={18} />
+                }
               </button>
             </form>
           </motion.div>
         </div>
 
-        {/* Related posts */}
+        {/* Related posts — only mock images for now */}
         {relatedPosts.length > 0 && (
           <div className="mt-10">
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">More to Explore</h3>
+            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
+              More to Explore
+            </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {relatedPosts.map((rp) => (
                 <Link key={rp.id} to={`/post/${rp.id}`}

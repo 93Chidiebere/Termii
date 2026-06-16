@@ -31,6 +31,18 @@ class PostSave(Document):
         name = "post_saves"
 
 
+# ── Comment model ─────────────────────────────────────────────────────────────
+class PostComment(Document):
+    post_id: str
+    user_id: str
+    user_name: str
+    text: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "post_comments"
+
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class PostCreate(BaseModel):
     caption: str
@@ -38,6 +50,19 @@ class PostCreate(BaseModel):
     tags: Optional[List[str]] = []
     media_url: Optional[str] = None
     media_type: Optional[str] = None
+
+
+class CommentCreate(BaseModel):
+    text: str
+
+
+class CommentResponse(BaseModel):
+    id: str
+    post_id: str
+    user_id: str
+    user_name: str
+    text: str
+    created_at: str
 
 
 class PostResponse(BaseModel):
@@ -52,6 +77,7 @@ class PostResponse(BaseModel):
     created_at: str
     likes_count: int = 0
     saves_count: int = 0
+    comments_count: int = 0
     is_liked: bool = False
     is_saved: bool = False
 
@@ -63,6 +89,7 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
     post_id = str(post.id)
     likes_count = await PostLike.find(PostLike.post_id == post_id).count()
     saves_count = await PostSave.find(PostSave.post_id == post_id).count()
+    comments_count = await PostComment.find(PostComment.post_id == post_id).count()
     is_liked = await PostLike.find_one(
         PostLike.post_id == post_id,
         PostLike.user_id == current_user_id
@@ -84,6 +111,7 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
         created_at=post.created_at.isoformat(),
         likes_count=likes_count,
         saves_count=saves_count,
+        comments_count=comments_count,
         is_liked=is_liked,
         is_saved=is_saved,
     )
@@ -123,7 +151,7 @@ async def get_posts():
     return result
 
 
-# ── GET /posts/my — fetch current user's posts ────────────────────────────────
+# ── GET /posts/my — fetch current user's posts ───────────────────────────────
 @router.get("/my", response_model=List[PostResponse])
 async def get_my_posts(current_user: User = Depends(get_current_user)):
     posts = await Post.find(
@@ -135,7 +163,7 @@ async def get_my_posts(current_user: User = Depends(get_current_user)):
     return result
 
 
-# ── GET /posts/saved — fetch current user's saved posts ───────────────────────
+# ── GET /posts/saved — fetch current user's saved posts ──────────────────────
 @router.get("/saved", response_model=List[PostResponse])
 async def get_saved_posts(current_user: User = Depends(get_current_user)):
     saves = await PostSave.find(
@@ -152,7 +180,7 @@ async def get_saved_posts(current_user: User = Depends(get_current_user)):
     return result
 
 
-# ── GET /posts/{id} — fetch single post ───────────────────────────────────────
+# ── GET /posts/{post_id} — fetch single post ─────────────────────────────────
 @router.get("/{post_id}", response_model=PostResponse)
 async def get_post(post_id: str):
     post = await Post.get(post_id)
@@ -165,7 +193,7 @@ async def get_post(post_id: str):
     return await build_post_response(post, user, "")
 
 
-# ── POST /posts/{id}/like — toggle like ───────────────────────────────────────
+# ── POST /posts/{post_id}/like — toggle like ─────────────────────────────────
 @router.post("/{post_id}/like")
 async def toggle_like(
     post_id: str,
@@ -180,7 +208,6 @@ async def toggle_like(
         PostLike.post_id == post_id,
         PostLike.user_id == user_id
     )
-
     if existing:
         await existing.delete()
         liked = False
@@ -192,7 +219,7 @@ async def toggle_like(
     return {"liked": liked, "likes_count": likes_count}
 
 
-# ── POST /posts/{id}/save — toggle save ───────────────────────────────────────
+# ── POST /posts/{post_id}/save — toggle save ─────────────────────────────────
 @router.post("/{post_id}/save")
 async def toggle_save(
     post_id: str,
@@ -207,7 +234,6 @@ async def toggle_save(
         PostSave.post_id == post_id,
         PostSave.user_id == user_id
     )
-
     if existing:
         await existing.delete()
         saved = False
@@ -217,3 +243,54 @@ async def toggle_save(
 
     saves_count = await PostSave.find(PostSave.post_id == post_id).count()
     return {"saved": saved, "saves_count": saves_count}
+
+
+# ── GET /posts/{post_id}/comments — fetch comments ───────────────────────────
+@router.get("/{post_id}/comments", response_model=List[CommentResponse])
+async def get_comments(post_id: str):
+    comments = await PostComment.find(
+        PostComment.post_id == post_id
+    ).sort(PostComment.created_at).to_list()
+    return [
+        CommentResponse(
+            id=str(c.id),
+            post_id=c.post_id,
+            user_id=c.user_id,
+            user_name=c.user_name,
+            text=c.text,
+            created_at=c.created_at.isoformat(),
+        )
+        for c in comments
+    ]
+
+
+# ── POST /posts/{post_id}/comments — add a comment ───────────────────────────
+@router.post("/{post_id}/comments", response_model=CommentResponse)
+async def add_comment(
+    post_id: str,
+    comment_in: CommentCreate,
+    current_user: User = Depends(get_current_user),
+):
+    post = await Post.get(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if not comment_in.text.strip():
+        raise HTTPException(status_code=400, detail="Comment cannot be empty")
+
+    comment = PostComment(
+        post_id=post_id,
+        user_id=str(current_user.id),
+        user_name=current_user.full_name,
+        text=comment_in.text.strip(),
+    )
+    await comment.insert()
+
+    return CommentResponse(
+        id=str(comment.id),
+        post_id=comment.post_id,
+        user_id=comment.user_id,
+        user_name=comment.user_name,
+        text=comment.text,
+        created_at=comment.created_at.isoformat(),
+    )
