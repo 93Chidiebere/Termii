@@ -5,6 +5,8 @@ import { ArrowLeft, Send, ShieldAlert, Loader2, MessageCircle, Search, X, PenSqu
 import { AppLayout } from "@/components/layout/AppLayout";
 import { formatDistanceToNow } from "date-fns";
 import { useAuthStore } from "@/stores/authStore";
+import { useNotificationStore } from "@/stores/notificationStore";
+import { useMessageStore } from "@/stores/messageStore";
 import {
   getConversations,
   getMessageHistory,
@@ -14,11 +16,11 @@ import {
   type ApiMessage,
   type ApiUser,
 } from "@/lib/api";
-import { useNotificationStore } from "@/stores/notificationStore";
 
 const Messages = () => {
   const { isMinor, user, token } = useAuthStore();
   const currentUserId = user?.id || "";
+  const { clearUnread, incrementUnread } = useMessageStore();
 
   const [conversations, setConversations] = useState<ApiConversation[]>([]);
   const [activeConv, setActiveConv] = useState<ApiConversation | null>(null);
@@ -26,8 +28,6 @@ const Messages = () => {
   const [newMessage, setNewMessage] = useState("");
   const [isLoadingConvs, setIsLoadingConvs] = useState(true);
   const [isLoadingMsgs, setIsLoadingMsgs] = useState(false);
-
-  // New conversation search state
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<ApiUser[]>([]);
@@ -36,80 +36,25 @@ const Messages = () => {
   const socketRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
+  const activeConvRef = useRef<ApiConversation | null>(null);
   const location = useLocation();
 
-  // Auto-open conversation if navigated from a notification
+  // Keep ref in sync with state so WebSocket handler can read it
   useEffect(() => {
-    const state = location.state as { openConversation?: ApiConversation } | null;
-    if (state?.openConversation) {
-    // Use handleOpenConv to fetch message history properly
-    handleOpenConv(state.openConversation);
-    window.history.replaceState({}, "");
-    }
-  }, [location.state]);
+    activeConvRef.current = activeConv;
+  }, [activeConv]);
 
+  // Clear message unread count when user opens Messages
+  useEffect(() => {
+    clearUnread();
+  }, []);
 
-  // ── Scroll to bottom whenever messages change ──────────────────────────────
+  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // ── Connect WebSocket on mount ─────────────────────────────────────────────
-  useEffect(() => {
-    if (!token) return;
-    const socket = createChatSocket(token);
-    socketRef.current = socket;
-
-
-    socket.onmessage = (event) => {
-      try {
-        const incoming = JSON.parse(event.data);
-
-        // Handle notification payloads from backend
-        if (incoming.type === "notification") {
-          useNotificationStore.getState().addNotification({
-            type: incoming.notification_type,
-            title: incoming.title,
-            text: incoming.text,
-            link: incoming.link,
-            senderId: incoming.sender_id,
-            senderName: incoming.sender_name,
-          });
-        return;
-        }
-
-        // Handle chat messages
-        const msg = incoming as ApiMessage;
-        setMessages((prev) => {
-          const alreadyExists = prev.some((m) => m.id === msg.id);
-          if (alreadyExists) return prev;
-          return [...prev, msg];
-        });
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
-              ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
-              : c
-          )
-        );
-        if (msg.sender_id !== currentUserId) {
-          useNotificationStore.getState().addNotification({
-            type: "message",
-            title: msg.sender_name,
-            text: `sent you a message: "${msg.text.slice(0, 40)}${msg.text.length > 40 ? "..." : ""}"`,
-            link: "/messages",
-            senderId: msg.sender_id,
-            senderName: msg.sender_name,
-            senderEmail: "",
-         });
-        }
-      } catch {
-        // ignore malformed messages
-      }
-    };
-
-  // ── Fetch conversations on mount ───────────────────────────────────────────
+  // Fetch conversations on mount
   useEffect(() => {
     const load = async () => {
       setIsLoadingConvs(true);
@@ -125,7 +70,85 @@ const Messages = () => {
     load();
   }, []);
 
-  // ── Search users with debounce ─────────────────────────────────────────────
+  // Connect WebSocket
+  useEffect(() => {
+    if (!token) return;
+    const socket = createChatSocket(token);
+    socketRef.current = socket;
+
+    socket.onmessage = (event) => {
+      try {
+        const incoming = JSON.parse(event.data);
+
+        // Backend-pushed notification (likes, comments from posts)
+        if (incoming.type === "notification") {
+          useNotificationStore.getState().addNotification({
+            type: incoming.notification_type,
+            title: incoming.title,
+            text: incoming.text,
+            link: incoming.link,
+            senderId: incoming.sender_id,
+            senderName: incoming.sender_name,
+          });
+          return;
+        }
+
+        // Regular chat message
+        const msg = incoming as ApiMessage;
+        if (!msg.id || !msg.sender_id) return;
+
+        // Add to messages if this conversation is open
+        setMessages((prev) => {
+          const alreadyExists = prev.some((m) => m.id === msg.id);
+          if (alreadyExists) return prev;
+          return [...prev, msg];
+        });
+
+        // Update conversation list
+        setConversations((prev) => {
+          const exists = prev.some(
+            (c) => c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
+          );
+          if (exists) {
+            return prev.map((c) =>
+              c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
+                ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
+                : c
+            );
+          }
+          // New conversation — prepend to list
+          return [{
+            participant_id: msg.sender_id,
+            participant_name: msg.sender_name,
+            participant_email: "",
+            last_message: msg.text,
+            last_timestamp: msg.timestamp,
+            unread_count: 1,
+          }, ...prev];
+        });
+
+        // Increment unread badge only if message is from someone else
+        // and the user is NOT currently viewing that conversation
+        if (msg.sender_id !== currentUserId) {
+          const currentConv = activeConvRef.current;
+          const isViewingThisConv = currentConv?.participant_id === msg.sender_id;
+          if (!isViewingThisConv) {
+            incrementUnread();
+          }
+        }
+      } catch {
+        // ignore malformed messages
+      }
+    };
+
+    socket.onerror = () => {};
+
+    return () => {
+      socket.close();
+    };
+  }, [token]);
+
+  // Search users with debounce
   useEffect(() => {
     if (!searchQuery.trim()) {
       setSearchResults([]);
@@ -145,7 +168,28 @@ const Messages = () => {
     }, 400);
   }, [searchQuery]);
 
-  // ── Start a new conversation with a user from search ──────────────────────
+  // Auto-open conversation if navigated from a notification
+  const handleOpenConv = async (conv: ApiConversation) => {
+    setActiveConv(conv);
+    setIsLoadingMsgs(true);
+    try {
+      const history = await getMessageHistory(conv.participant_id);
+      setMessages(history);
+    } catch {
+      setMessages([]);
+    } finally {
+      setIsLoadingMsgs(false);
+    }
+  };
+
+  useEffect(() => {
+    const state = location.state as { openConversation?: ApiConversation } | null;
+    if (state?.openConversation) {
+      handleOpenConv(state.openConversation);
+      window.history.replaceState({}, "");
+    }
+  }, [location.state]);
+
   const handleStartConversation = (selectedUser: ApiUser) => {
     const conv: ApiConversation = {
       participant_id: selectedUser.id || "",
@@ -162,21 +206,6 @@ const Messages = () => {
     setActiveConv(conv);
   };
 
-  // ── Open an existing conversation ──────────────────────────────────────────
-  const handleOpenConv = async (conv: ApiConversation) => {
-    setActiveConv(conv);
-    setIsLoadingMsgs(true);
-    try {
-      const history = await getMessageHistory(conv.participant_id);
-      setMessages(history);
-    } catch {
-      setMessages([]);
-    } finally {
-      setIsLoadingMsgs(false);
-    }
-  };
-
-  // ── Send a message ─────────────────────────────────────────────────────────
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim() || !activeConv || !socketRef.current) return;
@@ -189,7 +218,6 @@ const Messages = () => {
     setNewMessage("");
   };
 
-  // ── Age restriction gate ───────────────────────────────────────────────────
   if (isMinor) {
     return (
       <AppLayout>
@@ -216,22 +244,13 @@ const Messages = () => {
 
           {/* ── CONVERSATION LIST ─────────────────────────────────────── */}
           {!activeConv && !showSearch && (
-            <motion.div
-              key="list"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col h-full"
-            >
-              {/* Header with New Message button */}
+            <motion.div key="list" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col h-full">
               <div className="px-4 py-5 border-b border-border flex items-center justify-between">
                 <h1 className="font-display text-2xl font-bold text-foreground">Messages</h1>
-                <button
-                  onClick={() => setShowSearch(true)}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-                >
-                  <PenSquare size={16} />
-                  New Message
+                <button onClick={() => setShowSearch(true)}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
+                  <PenSquare size={16} /> New Message
                 </button>
               </div>
 
@@ -245,24 +264,17 @@ const Messages = () => {
                     <MessageCircle size={28} className="text-muted-foreground" />
                   </div>
                   <p className="font-semibold text-foreground">No conversations yet</p>
-                  <p className="text-sm text-muted-foreground">
-                    Click "New Message" to start a conversation.
-                  </p>
-                  <button
-                    onClick={() => setShowSearch(true)}
-                    className="mt-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
-                  >
+                  <p className="text-sm text-muted-foreground">Click "New Message" to start a conversation.</p>
+                  <button onClick={() => setShowSearch(true)}
+                    className="mt-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity">
                     Start a conversation
                   </button>
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto">
                   {conversations.map((conv) => (
-                    <button
-                      key={conv.participant_id}
-                      onClick={() => handleOpenConv(conv)}
-                      className="w-full flex items-center gap-3 px-4 py-4 hover:bg-card transition-colors border-b border-border text-left"
-                    >
+                    <button key={conv.participant_id} onClick={() => handleOpenConv(conv)}
+                      className="w-full flex items-center gap-3 px-4 py-4 hover:bg-card transition-colors border-b border-border text-left">
                       <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
                         <span className="text-base font-bold text-primary">
                           {conv.participant_name[0].toUpperCase()}
@@ -270,9 +282,7 @@ const Messages = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <span className="font-semibold text-sm text-foreground">
-                            {conv.participant_name}
-                          </span>
+                          <span className="font-semibold text-sm text-foreground">{conv.participant_name}</span>
                           <span className="text-xs text-muted-foreground">
                             {formatDistanceToNow(new Date(conv.last_timestamp + "Z"), { addSuffix: true })}
                           </span>
@@ -293,40 +303,26 @@ const Messages = () => {
 
           {/* ── NEW MESSAGE SEARCH ────────────────────────────────────── */}
           {showSearch && (
-            <motion.div
-              key="search"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col h-full"
-            >
+            <motion.div key="search" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col h-full">
               <div className="px-4 py-4 border-b border-border flex items-center gap-3">
-                <button
-                  onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
+                <button onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchResults([]); }}
+                  className="text-muted-foreground hover:text-foreground">
                   <ArrowLeft size={22} />
                 </button>
                 <div className="flex-1 relative">
                   <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    autoFocus
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
+                  <input autoFocus value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Search by name or email..."
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                  />
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   {searchQuery && (
-                    <button
-                      onClick={() => { setSearchQuery(""); setSearchResults([]); }}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    >
+                    <button onClick={() => { setSearchQuery(""); setSearchResults([]); }}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                       <X size={14} />
                     </button>
                   )}
                 </div>
               </div>
-
               <div className="flex-1 overflow-y-auto">
                 {isSearching ? (
                   <div className="flex items-center justify-center py-12">
@@ -334,15 +330,10 @@ const Messages = () => {
                   </div>
                 ) : searchResults.length > 0 ? (
                   searchResults.map((u) => (
-                    <button
-                      key={u.id}
-                      onClick={() => handleStartConversation(u)}
-                      className="w-full flex items-center gap-3 px-4 py-4 hover:bg-card transition-colors border-b border-border text-left"
-                    >
+                    <button key={u.id} onClick={() => handleStartConversation(u)}
+                      className="w-full flex items-center gap-3 px-4 py-4 hover:bg-card transition-colors border-b border-border text-left">
                       <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
-                        <span className="text-base font-bold text-primary">
-                          {u.full_name[0].toUpperCase()}
-                        </span>
+                        <span className="text-base font-bold text-primary">{u.full_name[0].toUpperCase()}</span>
                       </div>
                       <div>
                         <p className="font-semibold text-sm text-foreground">{u.full_name}</p>
@@ -368,18 +359,11 @@ const Messages = () => {
 
           {/* ── CHAT VIEW ────────────────────────────────────────────── */}
           {activeConv && (
-            <motion.div
-              key="chat"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col h-full"
-            >
+            <motion.div key="chat" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="flex flex-col h-full">
               <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
-                <button
-                  onClick={() => { setActiveConv(null); setMessages([]); }}
-                  className="text-muted-foreground hover:text-foreground"
-                >
+                <button onClick={() => { setActiveConv(null); setMessages([]); }}
+                  className="text-muted-foreground hover:text-foreground">
                   <ArrowLeft size={22} />
                 </button>
                 <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
@@ -425,17 +409,11 @@ const Messages = () => {
               </div>
 
               <form onSubmit={handleSend} className="px-4 py-3 border-t border-border flex items-center gap-2">
-                <input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
+                <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
                   placeholder="Type a message..."
-                  className="flex-1 px-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <button
-                  type="submit"
-                  disabled={!newMessage.trim()}
-                  className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 transition-opacity"
-                >
+                  className="flex-1 px-4 py-2.5 rounded-full bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                <button type="submit" disabled={!newMessage.trim()}
+                  className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-40 transition-opacity">
                   <Send size={18} />
                 </button>
               </form>

@@ -3,6 +3,7 @@ import { Home, Search, PlusSquare, Bell, User, MessageCircle, Shield, Users, Sho
 import { useAuthStore } from "@/stores/authStore";
 import { useRoleStore } from "@/stores/roleStore";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useMessageStore } from "@/stores/messageStore";
 
 const navItems = [
   { to: "/feed", icon: Home, label: "Home" },
@@ -21,6 +22,7 @@ export const DesktopSidebar = () => {
   const { user, isAuthenticated, logout } = useAuthStore();
   const { hasRole } = useRoleStore();
   const notifCount = useNotificationStore((state) => state.unreadCount());
+  const msgCount = useMessageStore((state) => state.unreadCount);
 
   const isAdmin = isAuthenticated && user && hasRole(user.id, "admin");
   const displayName = user?.displayName || user?.name || user?.email?.split("@")[0] || "Profile";
@@ -42,6 +44,7 @@ export const DesktopSidebar = () => {
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to;
           const isNotif = to === "/activity";
+          const isMsg = to === "/messages";
           return (
             <NavLink
               key={to}
@@ -57,6 +60,11 @@ export const DesktopSidebar = () => {
                 {isNotif && notifCount > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
                     {notifCount > 9 ? "9+" : notifCount}
+                  </span>
+                )}
+                {isMsg && msgCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center">
+                    {msgCount > 9 ? "9+" : msgCount}
                   </span>
                 )}
               </div>

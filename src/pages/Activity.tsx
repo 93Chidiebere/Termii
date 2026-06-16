@@ -2,6 +2,7 @@ import { Heart, MessageCircle, UserPlus, AtSign, Share2, Bell } from "lucide-rea
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
+import { formatDistanceToNow } from "date-fns";
 import { useNotificationStore, type NotificationType, type AppNotification } from "@/stores/notificationStore";
 
 const iconMap: Record<NotificationType, React.ReactNode> = {
@@ -109,7 +110,9 @@ const Activity = () => {
                     <span className="font-semibold">{n.title}</span>{" "}
                     {n.text}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{n.time}</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {(() => { try { return formatDistanceToNow(new Date(n.time), { addSuffix: true }); } catch { return "recently"; } })()}
+                  </p>
                 </div>
 
                 <div className={`p-2 rounded-full shrink-0 ${bgMap[n.type]}`}>

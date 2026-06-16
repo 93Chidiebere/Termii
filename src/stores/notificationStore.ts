@@ -1,6 +1,7 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
-export type NotificationType = "like" | "comment" | "follow" | "mention" | "share" | "message";
+export type NotificationType = "like" | "comment" | "follow" | "mention" | "share";
 
 export interface AppNotification {
   id: string;
@@ -11,10 +12,8 @@ export interface AppNotification {
   read: boolean;
   link: string;
   avatar?: string;
-  // Extra fields for message notifications
   senderId?: string;
   senderName?: string;
-  senderEmail?: string;
 }
 
 interface NotificationState {
@@ -25,34 +24,37 @@ interface NotificationState {
   unreadCount: () => number;
 }
 
-export const useNotificationStore = create<NotificationState>((set, get) => ({
-  notifications: [],
+export const useNotificationStore = create<NotificationState>()(
+  persist(
+    (set, get) => ({
+      notifications: [],
 
-  addNotification: (n) => {
-    const notification: AppNotification = {
-      ...n,
-      id: `notif-${Date.now()}-${Math.random()}`,
-      time: "just now",
-      read: false,
-    };
-    set((state) => ({
-      notifications: [notification, ...state.notifications].slice(0, 50),
-    }));
-  },
+      addNotification: (n) => {
+        const notification: AppNotification = {
+          ...n,
+          id: `notif-${Date.now()}-${Math.random()}`,
+          time: new Date().toISOString(),
+          read: false,
+        };
+        set((state) => ({
+          notifications: [notification, ...state.notifications].slice(0, 50),
+        }));
+      },
 
-  markRead: (id) => {
-    set((state) => ({
-      notifications: state.notifications.map((n) =>
-        n.id === id ? { ...n, read: true } : n
-      ),
-    }));
-  },
+      markRead: (id) =>
+        set((state) => ({
+          notifications: state.notifications.map((n) =>
+            n.id === id ? { ...n, read: true } : n
+          ),
+        })),
 
-  markAllRead: () => {
-    set((state) => ({
-      notifications: state.notifications.map((n) => ({ ...n, read: true })),
-    }));
-  },
+      markAllRead: () =>
+        set((state) => ({
+          notifications: state.notifications.map((n) => ({ ...n, read: true })),
+        })),
 
-  unreadCount: () => get().notifications.filter((n) => !n.read).length,
-}));
+      unreadCount: () => get().notifications.filter((n) => !n.read).length,
+    }),
+    { name: "termii-notifications" }
+  )
+);
