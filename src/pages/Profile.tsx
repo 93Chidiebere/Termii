@@ -4,8 +4,7 @@ import { Settings, Grid3X3, Bookmark, Camera, LogOut, Loader2 } from "lucide-rea
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
-import { getMyPosts, getSavedPosts } from "@/lib/api";
-import type { Post } from "@/data/mockData";
+// import type { Post } from "@/data/mockData";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +12,8 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { getMyPosts, getSavedPosts, apiClient } from "@/lib/api";
+import { useFollowStore } from "@/stores/followStore";
 
 const hairTypes = ["3A", "3B", "3C", "4A", "4B", "4C"];
 
@@ -69,6 +70,28 @@ const Profile = () => {
     };
     load();
   }, []);
+
+  const { getFollowersCount } = useFollowStore();
+
+  // Fetch real follower/following counts
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    const loadCounts = async () => {
+      try {
+        const response = await apiClient.get(`/follows/${user.id}/status`,
+          { headers: { Authorization: `Bearer ${localStorage.getItem("termii-token")}` }}
+        );
+        setFollowerCount(response.data.followers_count);
+        setFollowingCount(response.data.following_count);
+      } catch {
+        // keep 0
+      }
+    };
+    loadCounts();
+  }, [user?.id]);
 
   const visiblePosts = tab === "posts" ? userPosts : savedPosts;
 

@@ -10,8 +10,9 @@ async def init_db():
     from app.models.message import Message
     from app.api.routes.shop.models import Product
     from app.api.routes.posts import PostLike, PostSave, PostComment
+    from app.api.routes.follows import Follow
 
     await init_beanie(
         database=client.get_default_database(),
-        document_models=[User, Post, Message, Product, PostLike, PostSave, PostComment]
+        document_models=[User, Post, Message, Product, PostLike, PostSave, PostComment, Follow]
     )
