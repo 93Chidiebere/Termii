@@ -80,31 +80,19 @@ const Messages = () => {
       try {
         const incoming = JSON.parse(event.data);
 
-        // Backend-pushed notification (likes, comments from posts)
-        if (incoming.type === "notification") {
-          useNotificationStore.getState().addNotification({
-            type: incoming.notification_type,
-            title: incoming.title,
-            text: incoming.text,
-            link: incoming.link,
-            senderId: incoming.sender_id,
-            senderName: incoming.sender_name,
-          });
-          return;
-        }
+        // Skip notification payloads — handled by useGlobalSocket in App.tsx
+        if (incoming.type === "notification") return;
 
-        // Regular chat message
+        // Handle chat messages only
         const msg = incoming as ApiMessage;
         if (!msg.id || !msg.sender_id) return;
 
-        // Add to messages if this conversation is open
         setMessages((prev) => {
           const alreadyExists = prev.some((m) => m.id === msg.id);
           if (alreadyExists) return prev;
           return [...prev, msg];
         });
 
-        // Update conversation list
         setConversations((prev) => {
           const exists = prev.some(
             (c) => c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
@@ -116,7 +104,6 @@ const Messages = () => {
                 : c
             );
           }
-          // New conversation — prepend to list
           return [{
             participant_id: msg.sender_id,
             participant_name: msg.sender_name,
@@ -127,14 +114,8 @@ const Messages = () => {
           }, ...prev];
         });
 
-        // Increment unread badge only if message is from someone else
-        // and the user is NOT currently viewing that conversation
         if (msg.sender_id !== currentUserId) {
-          const currentConv = activeConvRef.current;
-          const isViewingThisConv = currentConv?.participant_id === msg.sender_id;
-          if (!isViewingThisConv) {
-            incrementUnread();
-          }
+          incrementUnread();
         }
       } catch {
         // ignore malformed messages

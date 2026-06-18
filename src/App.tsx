@@ -25,12 +25,14 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import { useEffect } from "react";
 import { useFollowStore } from "@/stores/followStore";
 import { useAuthStore } from "@/stores/authStore";
+import { useGlobalSocket } from "@/hooks/useGlobalSocket";
 
 const queryClient = new QueryClient();
 
 const App = () => {
   const { isAuthenticated } = useAuthStore();
   const { loadMyFollowing } = useFollowStore();
+  useGlobalSocket();
 
   useEffect(() => {
     if (isAuthenticated) {

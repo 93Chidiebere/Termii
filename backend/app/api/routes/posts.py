@@ -215,25 +215,25 @@ async def toggle_like(
         await PostLike(post_id=post_id, user_id=user_id).insert()
         liked = True
 
-        # Notify post owner via WebSocket if they are online and it's a new like
-        await post.fetch_link(Post.user)
-        post_owner = post.user
-        if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
-            from app.services.chat_manager import chat_manager
-            import json
-            notification_payload = json.dumps({
-                "type": "notification",
-                "notification_type": "like",
-                "title": current_user.full_name,
-                "text": "liked your post",
-                "link": f"/post/{post_id}",
-                "sender_id": str(current_user.id),
-                "sender_name": current_user.full_name,
-            })
-            await chat_manager.send_personal_message(
-                notification_payload,
-                str(post_owner.id)
-            )
+        # Notify post owner — wrapped so it never breaks the like action
+        try:
+            await post.fetch_link(Post.user)
+            post_owner = post.user
+            if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
+                from app.services.chat_manager import chat_manager
+                import json
+                payload = json.dumps({
+                    "type": "notification",
+                    "notification_type": "like",
+                    "title": current_user.full_name,
+                    "text": "liked your post",
+                    "link": f"/post/{post_id}",
+                    "sender_id": str(current_user.id),
+                    "sender_name": current_user.full_name,
+                })
+                await chat_manager.send_personal_message(payload, str(post_owner.id))
+        except Exception:
+            pass  # Never let notification failure break the like action
 
     likes_count = await PostLike.find(PostLike.post_id == post_id).count()
     return {"liked": liked, "likes_count": likes_count}
@@ -306,25 +306,25 @@ async def add_comment(
     )
     await comment.insert()
 
-    # Notify post owner via WebSocket if they are online
-    await post.fetch_link(Post.user)
-    post_owner = post.user
-    if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
-        from app.services.chat_manager import chat_manager
-        import json
-        notification_payload = json.dumps({
-            "type": "notification",
-            "notification_type": "comment",
-            "title": current_user.full_name,
-            "text": f'commented: "{comment_in.text.strip()[:40]}"',
-            "link": f"/post/{post_id}",
-            "sender_id": str(current_user.id),
-            "sender_name": current_user.full_name,
-        })
-        await chat_manager.send_personal_message(
-            notification_payload,
-            str(post_owner.id)
-        )
+    # Notify post owner — wrapped in try/except so it never breaks comment saving
+    try:
+        await post.fetch_link(Post.user)
+        post_owner = post.user
+        if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
+            from app.services.chat_manager import chat_manager
+            import json
+            payload = json.dumps({
+                "type": "notification",
+                "notification_type": "comment",
+                "title": current_user.full_name,
+                "text": f'commented: "{comment_in.text.strip()[:40]}"',
+                "link": f"/post/{post_id}",
+                "sender_id": str(current_user.id),
+                "sender_name": current_user.full_name,
+            })
+            await chat_manager.send_personal_message(payload, str(post_owner.id))
+    except Exception:
+        pass  # Never let notification failure break comment saving
 
     return CommentResponse(
         id=str(comment.id),
