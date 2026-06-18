@@ -7,7 +7,6 @@ import { useFollowStore } from "@/stores/followStore";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
-import { useNotificationStore } from "@/stores/notificationStore";
 import { toggleLike, toggleSave } from "@/lib/api";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -26,7 +25,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const { isFollowing, toggleFollow } = useFollowStore();
   const { isBlocked } = useBlockMuteStore();
   const { toast } = useToast();
-  const { addNotification } = useNotificationStore();
   const following = isFollowing(post.userId);
   const isOwnPost = user?.id === post.userId;
 
@@ -44,14 +42,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
       const result = await toggleLike(post.id);
       setLiked(result.liked);
       setLikeCount(result.likes_count);
-      if (result.liked && user?.id !== post.userId) {
-        addNotification({
-          type: "like",
-          title: user?.displayName || user?.name || "Someone",
-          text: "liked your post",
-          link: `/post/${post.id}`,
-        });
-      }
     } catch {
       setLiked(!newLiked);
       setLikeCount((c) => (newLiked ? c - 1 : c + 1));
