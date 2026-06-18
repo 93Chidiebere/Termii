@@ -1,5 +1,5 @@
 import axios from "axios";
-import type { Post, User } from "@/data/mockData";
+import type { Post, User } from "@/types";
 
 const BASE_URL = "https://termii-production.up.railway.app";
 

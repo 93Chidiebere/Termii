@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { posts as mockPosts } from "@/data/mockData";
-import type { Post } from "@/data/mockData";
+import type { Post } from "@/types";
 import { PostCard } from "@/components/feed/PostCard";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
@@ -9,14 +8,14 @@ import { Loader2 } from "lucide-react";
 
 const Index = () => {
   const { isMuted, isBlocked } = useBlockMuteStore();
-  const [realPosts, setRealPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchPosts = useCallback(async () => {
     try {
       const data = await getPosts();
-      setRealPosts(data);
+      setPosts(data);
       setError(null);
     } catch {
       setError("Could not load posts from server.");
@@ -25,27 +24,20 @@ const Index = () => {
     }
   }, []);
 
-  // Initial load
   useEffect(() => {
     setIsLoading(true);
     fetchPosts();
   }, [fetchPosts]);
 
-  // Re-fetch when user returns to this tab/page
   useEffect(() => {
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
-        fetchPosts();
-      }
+      if (document.visibilityState === "visible") fetchPosts();
     };
     document.addEventListener("visibilitychange", handleVisibility);
     return () => document.removeEventListener("visibilitychange", handleVisibility);
   }, [fetchPosts]);
 
-  const realPostIds = new Set(realPosts.map((p) => p.id));
-  const filteredMockPosts = mockPosts.filter((p) => !realPostIds.has(p.id));
-  const allPosts = [...realPosts, ...filteredMockPosts];
-  const visiblePosts = allPosts.filter(
+  const visiblePosts = posts.filter(
     (p) => !isMuted(p.userId) && !isBlocked(p.userId)
   );
 
@@ -67,7 +59,7 @@ const Index = () => {
 
         {!isLoading && error && (
           <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm text-center">
-            {error} Showing cached posts.
+            {error}
           </div>
         )}
 

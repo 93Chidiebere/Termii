@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import type { Post } from "@/data/mockData";
+import type { Post } from "@/types";
 import { useFollowStore } from "@/stores/followStore";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { useToast } from "@/hooks/use-toast";

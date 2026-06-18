@@ -5,7 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { getMyPosts, getSavedPosts, updateMyProfile, apiClient } from "@/lib/api";
-import type { Post } from "@/data/mockData";
+import type { Post } from "@/types";
 import {
   Dialog,
   DialogContent,

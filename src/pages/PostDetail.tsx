@@ -6,7 +6,6 @@ import {
   Share2, Send, MoreHorizontal, Loader2,
 } from "lucide-react";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { posts as mockPosts } from "@/data/mockData";
 import { useFollowStore } from "@/stores/followStore";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -16,7 +15,7 @@ import {
   getPostById, toggleLike, toggleSave,
   getComments, addComment, type ApiComment,
 } from "@/lib/api";
-import type { Post } from "@/data/mockData";
+import type { Post } from "@/types";
 import { formatDistanceToNow } from "date-fns";
 
 const FollowButton = ({ userId }: { userId: string }) => {
@@ -163,8 +162,6 @@ const PostDetail = () => {
     );
   }
 
-  const relatedPosts = mockPosts.filter((p) => p.id !== post.id && p.image).slice(0, 4);
-
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto px-4 py-4">
@@ -309,23 +306,6 @@ const PostDetail = () => {
           </motion.div>
         </div>
 
-        {/* Related posts — only mock images for now */}
-        {relatedPosts.length > 0 && (
-          <div className="mt-10">
-            <h3 className="font-display text-lg font-semibold text-foreground mb-4">
-              More to Explore
-            </h3>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {relatedPosts.map((rp) => (
-                <Link key={rp.id} to={`/post/${rp.id}`}
-                  className="aspect-square rounded-xl overflow-hidden">
-                  <img src={rp.image} alt=""
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300" />
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </AppLayout>
   );
