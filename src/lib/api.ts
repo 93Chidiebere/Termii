@@ -114,6 +114,7 @@ export const transformPost = (apiPost: ApiPost): Post => {
     userId: apiPost.user_id,
     user,
     image: apiPost.media_url || undefined,
+    mediaType: apiPost.media_type || undefined,
     caption: apiPost.caption,
     hairType: apiPost.hair_type || "",
     tags: apiPost.tags || [],
@@ -258,5 +259,24 @@ export const createProduct = async (data: {
   tags?: string[];
 }): Promise<ApiProduct> => {
   const response = await apiClient.post("/shop/", data);
+  return response.data;
+};
+
+// ── Profile ───────────────────────────────────────────────────────────────────
+
+export interface HairProfileData {
+  full_name?: string;
+  hair_type?: string;
+  hair_porosity?: string;
+  hair_density?: string;
+  hair_pattern?: string;
+  hair_length?: string;
+  hair_goals?: string[];
+  hair_treatments?: string[];
+  avatar_url?: string;
+}
+
+export const updateMyProfile = async (data: HairProfileData) => {
+  const response = await apiClient.patch("/auth/me", data);
   return response.data;
 };

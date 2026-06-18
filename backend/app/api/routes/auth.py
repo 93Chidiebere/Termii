@@ -6,6 +6,8 @@ from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
 from app.services.auth import get_password_hash, verify_password, create_access_token
 from app.core.config import settings
+from typing import List, Optional as Opt
+from pydantic import BaseModel as BM
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -77,3 +79,25 @@ async def search_users(
         and str(u.id) != str(current_user.id)  # exclude self
     ]
     return [UserResponse.from_mongo(u) for u in results[:10]]  # max 10 results
+
+class HairProfileUpdate(BM):
+    full_name: Opt[str] = None
+    hair_type: Opt[str] = None
+    hair_porosity: Opt[str] = None
+    hair_density: Opt[str] = None
+    hair_pattern: Opt[str] = None
+    hair_length: Opt[str] = None
+    hair_goals: Opt[List[str]] = None
+    hair_treatments: Opt[List[str]] = None
+    avatar_url: Opt[str] = None
+
+@router.patch("/me")
+async def update_me(
+    updates: HairProfileUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    data = updates.model_dump(exclude_none=True)
+    for key, value in data.items():
+        setattr(current_user, key, value)
+    await current_user.save()
+    return UserResponse.from_mongo(current_user)
