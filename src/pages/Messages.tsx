@@ -70,64 +70,91 @@ const Messages = () => {
     load();
   }, []);
 
-  // Connect WebSocket
+
+  // Connect WebSocket with auto-reconnect
   useEffect(() => {
     if (!token) return;
-    const socket = createChatSocket(token);
-    socketRef.current = socket;
 
-    socket.onmessage = (event) => {
-      try {
-        const incoming = JSON.parse(event.data);
+    let isUnmounted = false;
+    let reconnectAttempts = 0;
+    let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
 
-        // Skip notification payloads — handled by useGlobalSocket in App.tsx
-        if (incoming.type === "notification") return;
+    const connect = () => {
+      if (isUnmounted) return;
 
-        // Handle chat messages only
-        const msg = incoming as ApiMessage;
-        if (!msg.id || !msg.sender_id) return;
+      const socket = createChatSocket(token);
+      socketRef.current = socket;
 
-        setMessages((prev) => {
-          const alreadyExists = prev.some((m) => m.id === msg.id);
-          if (alreadyExists) return prev;
-          return [...prev, msg];
-        });
+      socket.onopen = () => {
+        reconnectAttempts = 0;
+      };
 
-        setConversations((prev) => {
-          const exists = prev.some(
-            (c) => c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
-          );
-          if (exists) {
-            return prev.map((c) =>
-              c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
-                ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
-                : c
+      socket.onmessage = (event) => {
+        try {
+          const incoming = JSON.parse(event.data);
+
+          // Skip notification payloads — handled by useGlobalSocket
+          if (incoming.type === "notification") return;
+
+          const msg = incoming as ApiMessage;
+          if (!msg.id || !msg.sender_id) return;
+
+          setMessages((prev) => {
+            const alreadyExists = prev.some((m) => m.id === msg.id);
+            if (alreadyExists) return prev;
+            return [...prev, msg];
+          });
+
+          setConversations((prev) => {
+            const exists = prev.some(
+              (c) => c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
             );
-          }
-          return [{
-            participant_id: msg.sender_id,
-            participant_name: msg.sender_name,
-            participant_email: "",
-            last_message: msg.text,
-            last_timestamp: msg.timestamp,
-            unread_count: 1,
-          }, ...prev];
-        });
+            if (exists) {
+              return prev.map((c) =>
+                c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
+                  ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
+                  : c
+              );
+            }
+            return [{
+              participant_id: msg.sender_id,
+              participant_name: msg.sender_name,
+              participant_email: "",
+              last_message: msg.text,
+              last_timestamp: msg.timestamp,
+              unread_count: 1,
+            }, ...prev];
+          });
 
-        if (msg.sender_id !== currentUserId) {
-          incrementUnread();
+          if (msg.sender_id !== currentUserId) {
+            incrementUnread();
+          }
+        } catch {
+          // ignore malformed messages
         }
-      } catch {
-        // ignore malformed messages
-      }
+      };
+
+      socket.onerror = () => {};
+
+      socket.onclose = () => {
+        if (isUnmounted) return;
+        const delay = Math.min(1000 * 2 ** reconnectAttempts, 30000);
+        reconnectAttempts += 1;
+        reconnectTimeout = setTimeout(connect, delay);
+      };
     };
 
-    socket.onerror = () => {};
+    connect();
 
     return () => {
-      socket.close();
+      isUnmounted = true;
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+      socketRef.current?.close();
     };
   }, [token]);
+
+
+
 
   // Search users with debounce
   useEffect(() => {

@@ -3,29 +3,31 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Landing from "./pages/Landing";
-import Index from "./pages/Index";
-import Explore from "./pages/Explore";
-import Profile from "./pages/Profile";
-import PostDetail from "./pages/PostDetail";
-import Login from "./pages/Login";
-import Activity from "./pages/Activity";
-import Create from "./pages/Create";
-import Messages from "./pages/Messages";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import Admin from "./pages/Admin";
-import HairTwins from "./pages/HairTwins";
-import HairTwinDetail from "./pages/HairTwinDetail";
-import Marketplace from "./pages/Marketplace";
-import ProductDetail from "./pages/ProductDetail";
-import NotFound from "./pages/NotFound";
+import { lazy, Suspense } from "react";
 import { SplashScreen } from "./components/SplashScreen";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { useEffect } from "react";
 import { useFollowStore } from "@/stores/followStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useGlobalSocket } from "@/hooks/useGlobalSocket";
+
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Index = lazy(() => import("./pages/Index"));
+const Explore = lazy(() => import("./pages/Explore"));
+const Profile = lazy(() => import("./pages/Profile"));
+const PostDetail = lazy(() => import("./pages/PostDetail"));
+const Activity = lazy(() => import("./pages/Activity"));
+const Create = lazy(() => import("./pages/Create"));
+const Messages = lazy(() => import("./pages/Messages"));
+const Admin = lazy(() => import("./pages/Admin"));
+const HairTwins = lazy(() => import("./pages/HairTwins"));
+const HairTwinDetail = lazy(() => import("./pages/HairTwinDetail"));
+const Marketplace = lazy(() => import("./pages/Marketplace"));
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
+const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
 
@@ -47,14 +49,17 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
+
+        <Suspense fallback={
+          <div className="min-h-screen flex items-center justify-center bg-background">
+            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
           <Routes>
-            {/* Public routes */}
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
-
-            {/* Protected routes */}
             <Route path="/feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
             <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
@@ -69,6 +74,8 @@ const App = () => {
             <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
+        </Suspense>
+
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

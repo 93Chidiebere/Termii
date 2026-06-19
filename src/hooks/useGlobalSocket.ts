@@ -6,41 +6,61 @@ import { createChatSocket } from "@/lib/api";
 export const useGlobalSocket = () => {
   const { token, isAuthenticated } = useAuthStore();
   const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
-    // Don't open a second connection if one already exists and is open
-    if (socketRef.current?.readyState === WebSocket.OPEN) return;
+    let isUnmounted = false;
 
-    const socket = createChatSocket(token);
-    socketRef.current = socket;
+    const connect = () => {
+      if (isUnmounted) return;
 
-    socket.onmessage = (event) => {
-      try {
-        const incoming = JSON.parse(event.data);
+      const socket = createChatSocket(token);
+      socketRef.current = socket;
 
-        // Only handle notification payloads here
-        // Chat messages are handled by Messages.tsx's own socket
-        if (incoming.type === "notification") {
-          useNotificationStore.getState().addNotification({
-            type: incoming.notification_type,
-            title: incoming.title,
-            text: incoming.text,
-            link: incoming.link,
-            senderId: incoming.sender_id,
-            senderName: incoming.sender_name,
-          });
+      socket.onopen = () => {
+        reconnectAttemptsRef.current = 0; // reset backoff on successful connect
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const incoming = JSON.parse(event.data);
+          if (incoming.type === "notification") {
+            useNotificationStore.getState().addNotification({
+              type: incoming.notification_type,
+              title: incoming.title,
+              text: incoming.text,
+              link: incoming.link,
+              senderId: incoming.sender_id,
+              senderName: incoming.sender_name,
+            });
+          }
+        } catch {
+          // ignore malformed messages
         }
-      } catch {
-        // ignore malformed messages
-      }
+      };
+
+      socket.onerror = () => {
+        // onclose will fire next and handle reconnect
+      };
+
+      socket.onclose = () => {
+        if (isUnmounted) return;
+        // Exponential backoff: 1s, 2s, 4s, 8s, capped at 30s
+        const delay = Math.min(1000 * 2 ** reconnectAttemptsRef.current, 30000);
+        reconnectAttemptsRef.current += 1;
+        reconnectTimeoutRef.current = setTimeout(connect, delay);
+      };
     };
 
-    socket.onerror = () => {};
+    connect();
 
     return () => {
-      socket.close();
+      isUnmounted = true;
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      socketRef.current?.close();
       socketRef.current = null;
     };
   }, [isAuthenticated, token]);

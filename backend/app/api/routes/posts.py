@@ -118,6 +118,25 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
 
 
 # ── POST /posts/ — create a new post ─────────────────────────────────────────
+# @router.post("/", response_model=PostResponse)
+# async def create_post(
+#     post_in: PostCreate,
+#     current_user: User = Depends(get_current_user),
+# ):
+#     if not post_in.caption.strip():
+#         raise HTTPException(status_code=400, detail="Caption cannot be empty")
+
+#     post = Post(
+#         user=current_user,
+#         type=post_in.media_type.upper() if post_in.media_type else "TEXT",
+#         media_url=post_in.media_url,
+#         caption=post_in.caption,
+#         hashtags=post_in.tags or [],
+#         hair_type=post_in.hair_type,
+#     )
+#     await post.insert()
+#     return await build_post_response(post, current_user, str(current_user.id))
+
 @router.post("/", response_model=PostResponse)
 async def create_post(
     post_in: PostCreate,
@@ -125,6 +144,19 @@ async def create_post(
 ):
     if not post_in.caption.strip():
         raise HTTPException(status_code=400, detail="Caption cannot be empty")
+
+    # Reject base64 data URLs — only real hosted URLs allowed
+    if post_in.media_url and post_in.media_url.startswith("data:"):
+        raise HTTPException(
+            status_code=400,
+            detail="Raw image/video data is not allowed. Please upload media to get a hosted URL first."
+        )
+
+    if post_in.media_url and not post_in.media_url.startswith("https://"):
+        raise HTTPException(
+            status_code=400,
+            detail="Media URL must be a valid hosted https:// URL."
+        )
 
     post = Post(
         user=current_user,
@@ -136,6 +168,7 @@ async def create_post(
     )
     await post.insert()
     return await build_post_response(post, current_user, str(current_user.id))
+
 
 
 # ── GET /posts/ — fetch all posts (feed) — public ────────────────────────────
