@@ -1,5 +1,3 @@
-import { users } from "@/data/mockData";
-
 export type UserStatus = "active" | "suspended" | "banned";
 export type CreatorStatus = "pending" | "approved" | "rejected";
 export type ReportReason = "spam" | "harassment" | "inappropriate" | "misinformation" | "other";
@@ -39,23 +37,23 @@ export interface FlaggedPost {
 
 export const mockAdminUsers: AdminUser[] = [
   {
-    id: "1", username: "ujunaturals", displayName: "Uju", avatar: users[0].avatar,
+    id: "1", username: "ujunaturals", displayName: "Uju", avatar: "",
     email: "uju@example.com", status: "active", joinedAt: "2025-08-15", reportCount: 0,
   },
   {
-    id: "2", username: "adabeauty", displayName: "Ada", avatar: users[1].avatar,
+    id: "2", username: "adabeauty", displayName: "Ada", avatar: "",
     email: "ada@example.com", status: "active", joinedAt: "2025-09-20", reportCount: 1,
   },
   {
-    id: "3", username: "chioma_styles", displayName: "Chioma", avatar: users[0].avatar,
+    id: "3", username: "chioma_styles", displayName: "Chioma", avatar: "",
     email: "chioma@example.com", status: "suspended", joinedAt: "2025-11-02", reportCount: 3,
   },
   {
-    id: "4", username: "ngozi_locs", displayName: "Ngozi", avatar: users[1].avatar,
+    id: "4", username: "ngozi_locs", displayName: "Ngozi", avatar: "",
     email: "ngozi@example.com", status: "active", joinedAt: "2026-01-10", reportCount: 0,
   },
   {
-    id: "5", username: "amaka_curls", displayName: "Amaka", avatar: users[0].avatar,
+    id: "5", username: "amaka_curls", displayName: "Amaka", avatar: "",
     email: "amaka@example.com", status: "banned", joinedAt: "2025-07-05", reportCount: 8,
   },
 ];
@@ -89,7 +87,7 @@ export const mockCreatorRequests: CreatorRequest[] = [
 
 export const mockFlaggedPosts: FlaggedPost[] = [
   {
-    id: "fp1", postId: "2", caption: "Some flagged content here...", image: users[1].avatar,
+    id: "fp1", postId: "2", caption: "Some flagged content here...", image: "",
     author: mockAdminUsers[1],
     reporter: { username: "naturalqueen", displayName: "Natural Queen" },
     reason: "spam", details: "This looks like a promotional post for an unrelated product.",
