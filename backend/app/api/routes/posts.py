@@ -118,25 +118,6 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
 
 
 # ── POST /posts/ — create a new post ─────────────────────────────────────────
-# @router.post("/", response_model=PostResponse)
-# async def create_post(
-#     post_in: PostCreate,
-#     current_user: User = Depends(get_current_user),
-# ):
-#     if not post_in.caption.strip():
-#         raise HTTPException(status_code=400, detail="Caption cannot be empty")
-
-#     post = Post(
-#         user=current_user,
-#         type=post_in.media_type.upper() if post_in.media_type else "TEXT",
-#         media_url=post_in.media_url,
-#         caption=post_in.caption,
-#         hashtags=post_in.tags or [],
-#         hair_type=post_in.hair_type,
-#     )
-#     await post.insert()
-#     return await build_post_response(post, current_user, str(current_user.id))
-
 @router.post("/", response_model=PostResponse)
 async def create_post(
     post_in: PostCreate,
@@ -174,7 +155,7 @@ async def create_post(
 # ── GET /posts/ — fetch all posts (feed) — public ────────────────────────────
 @router.get("/", response_model=List[PostResponse])
 async def get_posts():
-    posts = await Post.find_all().to_list()
+    posts = await Post.find_all().sort(-Post.created_at).to_list()
     result = []
     for post in posts:
         await post.fetch_link(Post.user)
