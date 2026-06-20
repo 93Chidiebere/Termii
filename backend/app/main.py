@@ -22,7 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api.routes import auth, posts, chat, twins, follows
+from app.api.routes import auth, posts, chat, twins, follows, sellers
 from app.api.routes.shop import routes as shop
 
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
@@ -31,6 +31,7 @@ app.include_router(shop.router, prefix="/shop", tags=["shop"])
 app.include_router(twins.router, prefix="/twins", tags=["twins"])
 app.include_router(chat.router, prefix="/chat", tags=["chat"])
 app.include_router(follows.router, prefix="/follows", tags=["follows"])
+app.include_router(sellers.router, prefix="/sellers", tags=["sellers"])
 
 @app.get("/")
 async def root():

@@ -4,7 +4,7 @@ class Settings(BaseSettings):
     MONGODB_URI: str
     JWT_SECRET: str
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200
 
     AWS_ACCESS_KEY_ID: str = "your_aws_access_key"
     AWS_SECRET_ACCESS_KEY: str = "your_aws_secret_key"
@@ -13,6 +13,8 @@ class Settings(BaseSettings):
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
+
+    PAYSTACK_SECRET_KEY: str = ""
 
     class Config:
         env_file = ".env"
