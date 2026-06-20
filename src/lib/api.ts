@@ -280,3 +280,38 @@ export const updateMyProfile = async (data: HairProfileData) => {
   const response = await apiClient.patch("/auth/me", data);
   return response.data;
 };
+
+// ── Seller Onboarding ─────────────────────────────────────────────────────────
+
+export interface Bank {
+  name: string;
+  code: string;
+}
+
+export const getBankList = async (): Promise<Bank[]> => {
+  const response = await apiClient.get("/sellers/banks");
+  return response.data;
+};
+
+export const verifyBankAccount = async (
+  bankCode: string,
+  accountNumber: string
+): Promise<{ account_name: string; account_number: string }> => {
+  const response = await apiClient.post(
+    `/sellers/verify-account?bank_code=${bankCode}&account_number=${accountNumber}`
+  );
+  return response.data;
+};
+
+export interface OnboardSellerData {
+  seller_type: "individual" | "business";
+  business_name?: string;
+  cac_number?: string;
+  bank_code: string;
+  bank_account_number: string;
+}
+
+export const onboardSeller = async (data: OnboardSellerData) => {
+  const response = await apiClient.post("/sellers/onboard", data);
+  return response.data;
+};
