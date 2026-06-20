@@ -320,3 +320,55 @@ export const onboardSeller = async (data: OnboardSellerData) => {
   const response = await apiClient.post("/sellers/onboard", data);
   return response.data;
 };
+
+// ── Orders ────────────────────────────────────────────────────────────────────
+
+export interface ApiOrder {
+  id: string;
+  product_id: string;
+  product_title: string;
+  buyer_id: string;
+  seller_id: string;
+  amount: number;
+  currency: string;
+  status: string;
+  paystack_reference?: string;
+  delivery_address?: string;
+  created_at: string;
+}
+
+export const createOrder = async (
+  productId: string,
+  deliveryAddress?: string
+): Promise<{ order: ApiOrder; authorization_url: string }> => {
+  const response = await apiClient.post("/orders/", {
+    product_id: productId,
+    delivery_address: deliveryAddress,
+  });
+  return response.data;
+};
+
+export const verifyOrder = async (reference: string): Promise<ApiOrder> => {
+  const response = await apiClient.get(`/orders/verify/${reference}`);
+  return response.data;
+};
+
+export const getMyPurchases = async (): Promise<ApiOrder[]> => {
+  const response = await apiClient.get("/orders/my-purchases");
+  return response.data;
+};
+
+export const getMySales = async (): Promise<ApiOrder[]> => {
+  const response = await apiClient.get("/orders/my-sales");
+  return response.data;
+};
+
+export const markShipped = async (orderId: string): Promise<ApiOrder> => {
+  const response = await apiClient.put(`/orders/${orderId}/ship`);
+  return response.data;
+};
+
+export const confirmDelivery = async (orderId: string): Promise<ApiOrder> => {
+  const response = await apiClient.put(`/orders/${orderId}/deliver`);
+  return response.data;
+};

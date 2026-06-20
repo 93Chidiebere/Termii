@@ -282,6 +282,11 @@ const Profile = () => {
           Edit Profile
         </button>
 
+        <Link to="/orders"
+          className="block w-full mb-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-foreground text-center hover:bg-card transition-colors">
+          📦 My Orders
+        </Link>
+
         {/* Tabs */}
         <div className="flex border-b border-border mb-4">
           <button onClick={() => setTab("posts")}

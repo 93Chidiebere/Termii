@@ -9,7 +9,7 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { products as mockProducts, type Product } from "@/data/mockMarketplace";
 import { useToast } from "@/hooks/use-toast";
-import { getProductById, type ApiProduct } from "@/lib/api";
+import { getProductById, createOrder, type ApiProduct } from "@/lib/api";
 
 const transformApiProduct = (p: ApiProduct): Product => ({
   id: p.id,
@@ -40,6 +40,7 @@ const ProductDetail = () => {
   const { toast } = useToast();
   const [currentImage, setCurrentImage] = useState(0);
   const [saved, setSaved] = useState(false);
+  const [isBuying, setIsBuying] = useState(false);
   const [product, setProduct] = useState<Product | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -91,6 +92,21 @@ const ProductDetail = () => {
 
   const nextImage = () => setCurrentImage((i) => (i + 1) % product.images.length);
   const prevImage = () => setCurrentImage((i) => (i - 1 + product.images.length) % product.images.length);
+
+    const handleBuyNow = async () => {
+    if (!product) return;
+    setIsBuying(true);
+    try {
+      const result = await createOrder(product.id);
+      // Redirect to Paystack's hosted checkout page
+      window.location.href = result.authorization_url;
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || "Could not start checkout. Please try again.";
+      toast({ title: "Checkout failed", description: message, variant: "destructive" });
+      setIsBuying(false);
+    }
+  };
+
 
   return (
     <AppLayout>
@@ -219,12 +235,12 @@ const ProductDetail = () => {
           </div>
 
           <div className="mt-6 space-y-2.5">
-            <Button
-              className="w-full"
-              onClick={() => toast({ title: "Checkout coming soon!", description: product.name, duration: 2000 })}
-            >
-              <ShoppingBag size={16} className="mr-1.5" />
-              Buy Now
+            <Button className="w-full" onClick={handleBuyNow} disabled={isBuying}>
+              {isBuying ? (
+                <><Loader2 size={16} className="mr-1.5 animate-spin" /> Redirecting to checkout...</>
+              ) : (
+                <><ShoppingBag size={16} className="mr-1.5" /> Buy Now</>
+              )}
             </Button>
             <Button variant="outline" className="w-full" onClick={() => navigate("/messages")}>
               <MessageCircle size={16} className="mr-1.5" />

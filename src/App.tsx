@@ -28,6 +28,8 @@ const HairTwinDetail = lazy(() => import("./pages/HairTwinDetail"));
 const Marketplace = lazy(() => import("./pages/Marketplace"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+const OrderCallback = lazy(() => import("./pages/OrderCallback"));
+const Orders = lazy(() => import("./pages/Orders"));
 
 const queryClient = new QueryClient();
 
@@ -72,6 +74,8 @@ const App = () => {
             <Route path="/hair-twins/:id" element={<ProtectedRoute><HairTwinDetail /></ProtectedRoute>} />
             <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
             <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+            <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
+            <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
