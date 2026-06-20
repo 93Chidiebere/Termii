@@ -52,7 +52,7 @@ async def create_product(
         delivery_location=product_in.delivery_location,
         media_urls=product_in.media_urls,
         tags=product_in.tags,
-        status="APPROVED",  # Auto-approve for now; add admin review later
+        status="APPROVED",
     )
     await product.insert()
     await product.fetch_link(Product.seller)
@@ -70,6 +70,19 @@ async def get_approved_products():
         if hasattr(seller, "id"):
             result.append(build_product_response(product, seller))
     return result
+
+
+# ── GET /shop/{product_id} — fetch a single product ──────────────────────────
+@router.get("/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: str):
+    product = await Product.get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await product.fetch_link(Product.seller)
+    seller = product.seller
+    if not hasattr(seller, "id"):
+        raise HTTPException(status_code=404, detail="Seller not found")
+    return build_product_response(product, seller)
 
 
 # ── PUT /shop/{product_id}/approve — admin approval ───────────────────────────

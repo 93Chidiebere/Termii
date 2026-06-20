@@ -247,6 +247,11 @@ export const getProducts = async (): Promise<ApiProduct[]> => {
   return response.data;
 };
 
+export const getProductById = async (productId: string): Promise<ApiProduct> => {
+  const response = await apiClient.get(`/shop/${productId}`);
+  return response.data;
+};
+
 export const createProduct = async (data: {
   title: string;
   description: string;
