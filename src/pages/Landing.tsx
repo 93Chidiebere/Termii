@@ -8,7 +8,7 @@ import lowBun from "@/assets/low_bun.jpeg";
 
 const features = [
   { icon: Sparkles, title: "Share Your Journey", desc: "Post your natural hair looks, routines, and transformations with a community that celebrates you." },
-  { icon: Users, title: "Find Your Tribe", desc: "Connect with women who share your hair type, styling preferences, and beauty philosophy." },
+  { icon: Users, title: "Find Your Tribe", desc: "Connect with people who share your hair type, styling preferences, and beauty philosophy." },
   { icon: Heart, title: "Get Inspired", desc: "Discover trending styles, protective techniques, and product recommendations curated for African hair." },
   { icon: Compass, title: "Explore & Discover", desc: "Browse by hair type, style category, or trending tags to find your next signature look." },
 ];
@@ -26,13 +26,13 @@ const Landing = () => {
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
-              Sign In
+              Log In
             </Link>
             <Link
               to="/login?signup=true"
               className="px-5 py-2 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
             >
-              Join
+              Create Account
             </Link>
           </div>
         </div>
@@ -54,14 +54,14 @@ const Landing = () => {
               <span className="text-primary">African Natural Hair</span>
             </h1>
             <p className="text-lg text-muted-foreground mb-8 max-w-md leading-relaxed">
-              Discover styles, share your journey, and connect with a community that celebrates the beauty of natural African hair.
+              Discover styles, share your journey, and connect with a community that celebrates the beauty of natural African hair — for everyone who wears it.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link
-                to="/login?signup=true"
+                to="/blog"
                 className="px-8 py-3.5 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
               >
-                Get Started — It's Free
+                Read the Blog
               </Link>
               <Link
                 to="/explore"
@@ -102,7 +102,7 @@ const Landing = () => {
             Built for Our Hair
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Everything you need to embrace, style, and celebrate your natural hair — all in one place.
+            Everything you need to embrace, style, and celebrate your natural hair — all in one place. For natural curls, locs, beards, and everything in between.
           </p>
         </div>
         <div className="max-w-5xl mx-auto grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -132,7 +132,7 @@ const Landing = () => {
             Ready to Join?
           </h2>
           <p className="text-muted-foreground mb-8">
-            Thousands of women are already sharing their natural hair journeys. Be part of the movement.
+            People across the continent and diaspora are already sharing their natural hair journeys — locs, curls, braids, beards, and everything that makes our hair ours. Be part of the movement.
           </p>
           <Link
             to="/login?signup=true"
@@ -150,7 +150,12 @@ const Landing = () => {
             <span className="font-display text-lg font-bold text-foreground">Termii</span>
             <span className="text-xs text-muted-foreground ml-2">Your Hair is Your Pride</span>
           </div>
-          <p className="text-xs text-muted-foreground">© 2026 Termii. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Blog
+            </Link>
+            <p className="text-xs text-muted-foreground">© 2026 Termii. All rights reserved.</p>
+          </div>
         </div>
       </footer>
     </div>
