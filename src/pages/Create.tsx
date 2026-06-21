@@ -115,17 +115,6 @@ const Create = () => {
     try {
       let mediaUrl: string | undefined;
 
-      // // Step 1 — Upload media to Cloudinary if present
-      // if (mediaFile && mediaType) {
-      //   setUploadStatus(
-      //     mediaType === "video" ? "Uploading video..." : "Uploading image..."
-      //   );
-      //   mediaUrl = await uploadToCloudinary(mediaFile, mediaType, (pct) => {
-      //     setUploadProgress(pct);
-      //   });
-      //   setUploadStatus("Saving post...");
-      // }
-
       // Step 1 — Upload media to Cloudinary if present
       if (mediaFile && mediaType) {
         let fileToUpload = mediaFile;
@@ -152,9 +141,6 @@ const Create = () => {
         });
         setUploadStatus("Saving post...");
       }
-
-
-
 
       // Step 2 — Parse tags
       const parsedTags = tags
@@ -300,6 +286,7 @@ const Create = () => {
               <option value="">Select hair type</option>
               <option>3A</option><option>3B</option><option>3C</option>
               <option>4A</option><option>4B</option><option>4C</option>
+              <option>Locs</option><option>Beard</option>
             </select>
           </div>
 

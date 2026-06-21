@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { useFollowStore } from "@/stores/followStore";
 
-const hairTypes = ["3A", "3B", "3C", "4A", "4B", "4C"];
+const hairTypes = ["3A", "3B", "3C", "4A", "4B", "4C", "Locs", "Beard"];
 const porosityOptions = ["Low", "Medium", "High"];
 const densityOptions = ["Low", "Medium", "High"];
 const patternOptions = ["Straight", "Wavy", "Curly", "Coily"];
@@ -395,7 +395,7 @@ const Profile = () => {
             </div>
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Hair Type</label>
-              <div className="grid grid-cols-6 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 {hairTypes.map((type) => (
                   <button key={type} type="button" onClick={() => setHairType(type)}
                     className={`py-2 rounded-lg border text-xs font-semibold transition-all ${
