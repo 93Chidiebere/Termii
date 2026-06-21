@@ -8,9 +8,9 @@ const Blog = () => {
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft size={16} /> Back to Termii
+            <ArrowLeft size={16} /> Back to Termii Africa
           </Link>
-          <span className="font-display text-lg font-bold text-foreground">Termii Blog</span>
+          <span className="font-display text-lg font-bold text-foreground">Termii Africa Blog</span>
         </div>
       </header>
 
@@ -34,7 +34,7 @@ const Blog = () => {
             to="/login?signup=true"
             className="inline-block mt-6 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Join Termii in the Meantime
+            Join Termii Africa in the Meantime
           </Link>
         </motion.div>
       </main>

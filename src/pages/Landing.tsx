@@ -22,7 +22,7 @@ const Landing = () => {
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <div>
-            <span className="font-display text-xl font-bold text-foreground">Termii</span>
+            <span className="font-display text-xl font-bold text-foreground">Termii Africa</span>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -154,7 +154,7 @@ const Landing = () => {
             <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
-            <p className="text-xs text-muted-foreground">© 2026 Termii. All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 Termii Africa . All rights reserved.</p>
           </div>
         </div>
       </footer>
