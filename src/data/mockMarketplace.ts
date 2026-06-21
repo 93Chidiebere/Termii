@@ -41,6 +41,8 @@ export const categories = [
   "Oils",
   "Tools",
   "Accessories",
+  "Beard & Grooming",
+  "Locs & Maintenance",
 ];
 
 export const sellers: Seller[] = [
