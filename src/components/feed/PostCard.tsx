@@ -1,15 +1,16 @@
-import { useState } from "react";
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal } from "lucide-react";
-import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Send, Loader2, ChevronDown } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import type { Post } from "@/types";
 import { useFollowStore } from "@/stores/followStore";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
-import { toggleLike, toggleSave } from "@/lib/api";
+import { toggleLike, toggleSave, getComments, addComment, type ApiComment } from "@/lib/api";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { formatDistanceToNow } from "date-fns";
 
 interface PostCardProps {
   post: Post;
@@ -27,6 +28,67 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const { toast } = useToast();
   const following = isFollowing(post.userId);
   const isOwnPost = user?.id === post.userId;
+
+  // ── Inline comments state ────────────────────────────────────────────────
+  const [previewComment, setPreviewComment] = useState<ApiComment | null>(null);
+  const [commentCount, setCommentCount] = useState(post.comments);
+  const [expanded, setExpanded] = useState(false);
+  const [allComments, setAllComments] = useState<ApiComment[]>([]);
+  const [isLoadingComments, setIsLoadingComments] = useState(false);
+  const [newComment, setNewComment] = useState("");
+  const [isPosting, setIsPosting] = useState(false);
+
+  // Fetch just one preview comment on mount (cheap, no full list)
+  useEffect(() => {
+    if (commentCount === 0) return;
+    let cancelled = false;
+    const loadPreview = async () => {
+      try {
+        const data = await getComments(post.id);
+        if (!cancelled && data.length > 0) {
+          setPreviewComment(data[data.length - 1]); // most recent
+        }
+      } catch {
+        // silently fail — preview is non-critical
+      }
+    };
+    loadPreview();
+    return () => { cancelled = true; };
+  }, [post.id, commentCount]);
+
+  const handleToggleExpand = async () => {
+    const willExpand = !expanded;
+    setExpanded(willExpand);
+    if (willExpand && allComments.length === 0) {
+      setIsLoadingComments(true);
+      try {
+        const data = await getComments(post.id);
+        setAllComments(data);
+      } catch {
+        setAllComments([]);
+      } finally {
+        setIsLoadingComments(false);
+      }
+    }
+  };
+
+  const handlePostComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    setIsPosting(true);
+    try {
+      const comment = await addComment(post.id, newComment.trim());
+      setAllComments((prev) => [...prev, comment]);
+      setPreviewComment(comment);
+      setCommentCount((c) => c + 1);
+      setNewComment("");
+      if (!expanded) setExpanded(true);
+    } catch {
+      toast({ title: "Could not post comment. Please try again." });
+    } finally {
+      setIsPosting(false);
+    }
+  };
 
   if (isBlocked(post.userId)) return null;
 
@@ -102,7 +164,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
           <p className="text-xs text-muted-foreground">@{post.user.username}</p>
         </div>
 
-        {/* Follow button — hidden on own posts */}
         {!isOwnPost && (
           <button
             onClick={() => toggleFollow(post.userId)}
@@ -116,7 +177,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
           </button>
         )}
 
-        {/* Three-dot menu — hidden on own posts */}
         {!isOwnPost && (
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
@@ -180,9 +240,9 @@ export const PostCard = ({ post, index }: PostCardProps) => {
                 strokeWidth={1.5}
               />
             </button>
-            <Link to={`/post/${post.id}`} aria-label="View comments">
+            <button onClick={handleToggleExpand} aria-label="Toggle comments">
               <MessageCircle size={24} className="text-foreground" strokeWidth={1.5} />
-            </Link>
+            </button>
             <button onClick={handleShare} aria-label="Share post">
               <Share2 size={22} className="text-foreground" strokeWidth={1.5} />
             </button>
@@ -214,7 +274,89 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             </span>
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-2">{post.comments} comments</p>
+
+        {/* ── Comment preview (Instagram-style) ──────────────────────────── */}
+        {commentCount > 0 && !expanded && (
+          <div className="mt-2">
+            <button
+              onClick={handleToggleExpand}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              View all {commentCount} comment{commentCount !== 1 ? "s" : ""}
+            </button>
+            {previewComment && (
+              <p className="text-sm text-foreground mt-1">
+                <span className="font-semibold">{previewComment.user_name}</span>{" "}
+                {previewComment.text}
+              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Expanded inline comment panel ──────────────────────────────── */}
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              className="overflow-hidden"
+            >
+              <button
+                onClick={handleToggleExpand}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3 mb-2"
+              >
+                <ChevronDown size={14} className="rotate-180" /> Hide comments
+              </button>
+
+              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                {isLoadingComments ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 size={18} className="animate-spin text-primary" />
+                  </div>
+                ) : allComments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-2">No comments yet. Be the first!</p>
+                ) : (
+                  allComments.map((c) => (
+                    <div key={c.id}>
+                      <p className="text-sm text-foreground">
+                        <span className="font-semibold">{c.user_name}</span>{" "}
+                        {c.text}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
+                      </p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <form onSubmit={handlePostComment} className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                <input
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                  placeholder="Add a comment..."
+                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={!newComment.trim() || isPosting}
+                  className="text-primary disabled:opacity-40"
+                >
+                  {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+                </button>
+              </form>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {commentCount === 0 && !expanded && (
+          <p className="text-xs text-muted-foreground mt-2">
+            <button onClick={handleToggleExpand} className="hover:text-foreground transition-colors">
+              No comments yet — be the first
+            </button>
+          </p>
+        )}
       </div>
     </motion.article>
   );
