@@ -36,7 +36,7 @@ export const DesktopSidebar = () => {
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-warm-brown flex-col z-50">
       <div className="p-6 border-b border-sidebar-border">
-        <h1 className="font-display text-2xl font-bold text-sidebar-foreground">Termii</h1>
+        <h1 className="font-display text-2xl font-bold text-sidebar-foreground">Termii Africa</h1>
         <p className="text-xs text-sidebar-foreground/60 mt-1 tracking-wider uppercase">Your Hair is Your Pride</p>
       </div>
 
