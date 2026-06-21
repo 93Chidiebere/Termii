@@ -45,7 +45,7 @@ const Index = () => {
     <AppLayout>
       <div className="max-w-lg mx-auto px-4 py-6">
         <div className="md:hidden mb-6">
-          <h1 className="font-display text-2xl font-bold text-foreground">Termii</h1>
+          <h1 className="font-display text-2xl font-bold text-foreground">Termii Africa</h1>
           <p className="text-xs text-muted-foreground tracking-wider uppercase">
             Your Hair is Your Pride
           </p>

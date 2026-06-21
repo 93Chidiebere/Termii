@@ -102,7 +102,7 @@ const Landing = () => {
             Built for Our Hair
           </h2>
           <p className="text-muted-foreground max-w-xl mx-auto">
-            Everything you need to embrace, style, and celebrate your natural hair — all in one place. For natural curls, locs, beards, and everything in between.
+            Everything you need to embrace, style, and celebrate your natural hair. For natural curls, locs, beards, and everything in between.
           </p>
         </div>
         <div className="max-w-5xl mx-auto grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -147,7 +147,7 @@ const Landing = () => {
       <footer className="border-t border-border py-8 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <span className="font-display text-lg font-bold text-foreground">Termii</span>
+            <span className="font-display text-lg font-bold text-foreground">Termii Africa</span>
             <span className="text-xs text-muted-foreground ml-2">Your Hair is Your Pride</span>
           </div>
           <div className="flex items-center gap-4">
