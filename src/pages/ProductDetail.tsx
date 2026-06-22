@@ -10,6 +10,10 @@ import { Separator } from "@/components/ui/separator";
 import { products as mockProducts, type Product } from "@/data/mockMarketplace";
 import { useToast } from "@/hooks/use-toast";
 import { getProductById, createOrder, type ApiProduct } from "@/lib/api";
+import {
+  Search, TrendingUp, Sparkles, MapPin, Users,
+ ShieldAlert, Plus, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
+} from "lucide-react";
 
 const transformApiProduct = (p: ApiProduct): Product => ({
   id: p.id,
@@ -201,7 +205,12 @@ const ProductDetail = () => {
               )}
             </Avatar>
             <div className="flex-1">
-              <p className="font-semibold text-sm text-foreground">{product.seller.name}</p>
+              <p className="font-semibold text-sm text-foreground flex items-center gap-1">
+                {product.seller.name}
+                {product.seller.verificationStatus === "verified" && (
+                  <BadgeCheck size={14} className="text-blue-500 fill-blue-100" />
+                )}
+              </p>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                 <span className="flex items-center gap-0.5">
                   <Star size={11} className="fill-primary text-primary" />

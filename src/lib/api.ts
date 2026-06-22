@@ -231,6 +231,8 @@ export interface ApiSeller {
   rating: number;
   completed_orders: number;
   location: string;
+  verification_status: string;
+  seller_type?: string;
 }
 
 export interface ApiProduct {
@@ -379,5 +381,32 @@ export const markShipped = async (orderId: string): Promise<ApiOrder> => {
 
 export const confirmDelivery = async (orderId: string): Promise<ApiOrder> => {
   const response = await apiClient.put(`/orders/${orderId}/deliver`);
+  return response.data;
+};
+
+// ── Admin: Seller Verification ─────────────────────────────────────────────────
+
+export interface PendingSeller {
+  id: string;
+  full_name: string;
+  email: string;
+  seller_type: string;
+  business_name?: string;
+  cac_number?: string;
+  bank_account_name?: string;
+  verification_status: string;
+}
+
+export const getPendingSellers = async (): Promise<PendingSeller[]> => {
+  const response = await apiClient.get("/sellers/pending");
+  return response.data;
+};
+
+export const verifySeller = async (
+  userId: string,
+  approve: boolean,
+  notes?: string
+) => {
+  const response = await apiClient.put(`/sellers/${userId}/verify`, { approve, notes });
   return response.data;
 };

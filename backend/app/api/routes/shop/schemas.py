@@ -20,6 +20,8 @@ class SellerInfo(BaseModel):
     rating: float = 5.0
     completed_orders: int = 0
     location: str = ""
+    verification_status: str = "unverified"
+    seller_type: Optional[str] = None
 
 class ProductResponse(BaseModel):
     id: str

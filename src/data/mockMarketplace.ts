@@ -15,6 +15,7 @@ export interface Seller {
   rating: number;
   completedOrders: number;
   location: string;
+  verificationStatus?: string;
 }
 
 export interface Product {

@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Users, ShieldCheck, Flag, Ban, Search, ChevronRight,
   CheckCircle, XCircle, Clock, AlertTriangle, ExternalLink, ArrowLeft,
-  Image as ImageIcon, Upload, RotateCcw,
+  Image as ImageIcon, Upload, RotateCcw, BadgeCheck, Loader2, Building2, User as UserIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
@@ -13,6 +13,7 @@ import {
   mockAdminUsers, mockCreatorRequests, mockFlaggedPosts,
   type AdminUser, type CreatorRequest, type FlaggedPost, type UserStatus,
 } from "@/data/mockAdminData";
+import { getPendingSellers, verifySeller, type PendingSeller } from "@/lib/api";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -25,11 +26,12 @@ import {
   generateFaviconFromFile, loadStoredFavicon, clearFavicon,
 } from "@/lib/favicon";
 
-type AdminTab = "users" | "creators" | "flagged" | "suspend" | "branding";
+type AdminTab = "users" | "creators" | "sellers" | "flagged" | "suspend" | "branding";
 
 const tabs: { value: AdminTab; label: string; icon: React.ElementType }[] = [
   { value: "users", label: "Users", icon: Users },
   { value: "creators", label: "Creators", icon: ShieldCheck },
+  { value: "sellers", label: "Sellers", icon: BadgeCheck },
   { value: "flagged", label: "Flagged", icon: Flag },
   { value: "suspend", label: "Suspend/Ban", icon: Ban },
   { value: "branding", label: "Branding", icon: ImageIcon },
@@ -93,6 +95,7 @@ const AdminPanel = () => {
         <motion.div key={activeTab} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
           {activeTab === "users" && <UsersTab />}
           {activeTab === "creators" && <CreatorsTab />}
+          {activeTab === "sellers" && <SellersTab />}
           {activeTab === "flagged" && <FlaggedTab />}
           {activeTab === "suspend" && <SuspendBanTab />}
           {activeTab === "branding" && <BrandingTab />}
@@ -377,6 +380,166 @@ const FlaggedTab = () => {
           </div>
         </>
       )}
+    </div>
+  );
+};
+
+/* ====== SELLERS TAB ====== */
+const SellersTab = () => {
+  const [pending, setPending] = useState<PendingSeller[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [confirmAction, setConfirmAction] = useState<{ seller: PendingSeller; approve: boolean } | null>(null);
+  const [notes, setNotes] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
+
+  const loadPending = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getPendingSellers();
+      setPending(data);
+    } catch {
+      toast({ title: "Could not load pending sellers", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPending();
+  }, []);
+
+  const handleDecision = async () => {
+    if (!confirmAction) return;
+    setIsSubmitting(true);
+    try {
+      await verifySeller(confirmAction.seller.id, confirmAction.approve, notes || undefined);
+      toast({
+        title: confirmAction.approve ? "Seller verified" : "Seller rejected",
+        description: `${confirmAction.seller.business_name || confirmAction.seller.full_name} has been ${confirmAction.approve ? "approved" : "rejected"}.`,
+      });
+      setPending((prev) => prev.filter((s) => s.id !== confirmAction.seller.id));
+      setConfirmAction(null);
+      setNotes("");
+    } catch {
+      toast({ title: "Could not process this decision", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <div>
+      <h2 className="font-display text-lg font-semibold text-foreground mb-4">
+        Pending Seller Verifications ({pending.length})
+      </h2>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-primary" />
+        </div>
+      ) : pending.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
+          No pending seller verifications
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {pending.map((seller) => (
+            <div key={seller.id} className="bg-card border border-border rounded-xl p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                  {seller.seller_type === "business" ? (
+                    <Building2 size={18} className="text-primary" />
+                  ) : (
+                    <UserIcon size={18} className="text-primary" />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {seller.business_name || seller.full_name}
+                  </p>
+                  <p className="text-xs text-muted-foreground">{seller.email}</p>
+                </div>
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600 capitalize">
+                  {seller.seller_type}
+                </span>
+              </div>
+
+              <div className="space-y-1 text-sm mb-3">
+                {seller.cac_number && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">CAC Number</span>
+                    <span className="text-foreground font-medium">{seller.cac_number}</span>
+                  </div>
+                )}
+                {seller.bank_account_name && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Bank Account Name</span>
+                    <span className="text-foreground font-medium">{seller.bank_account_name}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setConfirmAction({ seller, approve: true })}
+                  className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle size={14} /> Verify
+                </button>
+                <button
+                  onClick={() => setConfirmAction({ seller, approve: false })}
+                  className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
+                >
+                  <XCircle size={14} /> Reject
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={!!confirmAction} onOpenChange={() => { setConfirmAction(null); setNotes(""); }}>
+        <DialogContent className="max-w-sm rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {confirmAction?.approve ? "Verify Seller?" : "Reject Seller?"}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.approve
+                ? `${confirmAction?.seller.business_name || confirmAction?.seller.full_name} will get the Verified Seller badge on all their listings.`
+                : `${confirmAction?.seller.business_name || confirmAction?.seller.full_name} will be marked as rejected and won't show the badge.`}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">
+                Internal notes <span className="text-muted-foreground">(optional, for your records)</span>
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="e.g. CAC certificate checked, matches business name..."
+                rows={3}
+                className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+              />
+            </div>
+            <button
+              onClick={handleDecision}
+              disabled={isSubmitting}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 ${
+                confirmAction?.approve
+                  ? "bg-primary text-primary-foreground hover:opacity-90"
+                  : "bg-destructive text-destructive-foreground hover:opacity-90"
+              }`}
+            >
+              {isSubmitting ? (
+                <><Loader2 size={16} className="animate-spin" /> Processing...</>
+              ) : confirmAction?.approve ? "Confirm Verification" : "Confirm Rejection"}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

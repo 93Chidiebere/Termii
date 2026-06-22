@@ -30,6 +30,8 @@ def build_product_response(product: Product, seller: User) -> ProductResponse:
             rating=5.0,
             completed_orders=0,
             location="",
+            verification_status=getattr(seller, "verification_status", "unverified"),
+            seller_type=getattr(seller, "seller_type", None),
         ),
         created_at=product.created_at.isoformat(),
     )

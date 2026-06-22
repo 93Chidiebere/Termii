@@ -2,8 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from app.models.user import User
-from app.api.routes.auth import get_current_user
 from app.services import paystack
+from app.api.routes.auth import get_current_user, get_current_admin
 
 router = APIRouter()
 
@@ -97,3 +97,58 @@ async def onboard_seller(
         bank_account_name=current_user.bank_account_name,
         subaccount_created=True,
     )
+
+# ── Admin: list pending sellers ────────────────────────────────────────────────
+class PendingSellerResponse(BaseModel):
+    id: str
+    full_name: str
+    email: str
+    seller_type: str
+    business_name: Optional[str] = None
+    cac_number: Optional[str] = None
+    bank_account_name: Optional[str] = None
+    verification_status: str
+
+
+@router.get("/pending", response_model=List[PendingSellerResponse])
+async def list_pending_sellers(admin: User = Depends(get_current_admin)):
+    sellers = await User.find(
+        User.verification_status == "pending"
+    ).to_list()
+    return [
+        PendingSellerResponse(
+            id=str(s.id),
+            full_name=s.full_name,
+            email=s.email,
+            seller_type=s.seller_type or "individual",
+            business_name=s.business_name,
+            cac_number=s.cac_number,
+            bank_account_name=s.bank_account_name,
+            verification_status=s.verification_status,
+        )
+        for s in sellers
+    ]
+
+
+class VerificationDecision(BaseModel):
+    approve: bool
+    notes: Optional[str] = None
+
+
+@router.put("/{user_id}/verify")
+async def verify_seller(
+    user_id: str,
+    decision: VerificationDecision,
+    admin: User = Depends(get_current_admin),
+):
+    target = await User.get(user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="Seller not found")
+
+    target.verification_status = "verified" if decision.approve else "rejected"
+    await target.save()
+
+    return {
+        "id": str(target.id),
+        "verification_status": target.verification_status,
+    }

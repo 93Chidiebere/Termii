@@ -1,9 +1,5 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import {
-  Search, Star, TrendingUp, Sparkles, MapPin, Users,
-  ShoppingBag, ShieldAlert, Plus, Loader2, X, Building2, User as UserIcon, CheckCircle2,
-} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -17,6 +13,10 @@ import {
 } from "@/lib/api";
 import type { Product } from "@/data/mockMarketplace";
 import { toast } from "sonner";
+import {
+  Search, Star, TrendingUp, Sparkles, MapPin, Users,
+  ShoppingBag, ShieldAlert, Plus, Loader2, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
+} from "lucide-react";
 
 const sectionFilters = [
   { key: "trending", label: "Trending", icon: TrendingUp },
@@ -40,6 +40,7 @@ const transformApiProduct = (p: ApiProduct): Product => ({
     rating: p.seller.rating,
     completedOrders: p.seller.completed_orders,
     location: p.seller.location || "",
+    verificationStatus: p.seller.verification_status,
   },
   deliveryOptions: p.delivery_location ? [p.delivery_location] : ["Standard (3-5 days)"],
   tags: p.tags,
@@ -70,7 +71,12 @@ const ProductCard = ({ product, onClick }: { product: Product; onClick: () => vo
         )}
       </div>
       <div className="p-3">
-        <p className="text-xs text-muted-foreground">{product.seller.name}</p>
+        <p className="text-xs text-muted-foreground flex items-center gap-1">
+          {product.seller.name}
+          {product.seller.verificationStatus === "verified" && (
+            <BadgeCheck size={12} className="text-blue-500 fill-blue-100" />
+          )}
+        </p>
         <h3 className="font-semibold text-sm line-clamp-2 mt-0.5 text-foreground">{product.name}</h3>
         <div className="flex items-center justify-between mt-2">
           <span className="font-bold text-foreground">{product.currency}{product.price.toLocaleString()}</span>
