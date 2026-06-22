@@ -157,12 +157,14 @@ export const toggleSave = async (postId: string): Promise<{ saved: boolean; save
   return response.data;
 };
 
+
 export interface ApiComment {
   id: string;
   post_id: string;
   user_id: string;
   user_name: string;
   text: string;
+  parent_comment_id?: string | null;
   created_at: string;
 }
 
@@ -171,8 +173,15 @@ export const getComments = async (postId: string): Promise<ApiComment[]> => {
   return response.data;
 };
 
-export const addComment = async (postId: string, text: string): Promise<ApiComment> => {
-  const response = await apiClient.post(`/posts/${postId}/comments`, { text });
+export const addComment = async (
+  postId: string,
+  text: string,
+  parentCommentId?: string
+): Promise<ApiComment> => {
+  const response = await apiClient.post(`/posts/${postId}/comments`, {
+    text,
+    parent_comment_id: parentCommentId,
+  });
   return response.data;
 };
 

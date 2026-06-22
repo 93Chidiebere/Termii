@@ -37,6 +37,7 @@ class PostComment(Document):
     user_id: str
     user_name: str
     text: str
+    parent_comment_id: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:
@@ -54,6 +55,7 @@ class PostCreate(BaseModel):
 
 class CommentCreate(BaseModel):
     text: str
+    parent_comment_id: Optional[str] = None
 
 
 class CommentResponse(BaseModel):
@@ -62,6 +64,7 @@ class CommentResponse(BaseModel):
     user_id: str
     user_name: str
     text: str
+    parent_comment_id: Optional[str] = None
     created_at: str
 
 
@@ -126,7 +129,6 @@ async def create_post(
     if not post_in.caption.strip():
         raise HTTPException(status_code=400, detail="Caption cannot be empty")
 
-    # Reject base64 data URLs — only real hosted URLs allowed
     if post_in.media_url and post_in.media_url.startswith("data:"):
         raise HTTPException(
             status_code=400,
@@ -149,7 +151,6 @@ async def create_post(
     )
     await post.insert()
     return await build_post_response(post, current_user, str(current_user.id))
-
 
 
 # ── GET /posts/ — fetch all posts (feed) — public ────────────────────────────
@@ -229,7 +230,6 @@ async def toggle_like(
         await PostLike(post_id=post_id, user_id=user_id).insert()
         liked = True
 
-        # Notify post owner — wrapped so it never breaks the like action
         try:
             await post.fetch_link(Post.user)
             post_owner = post.user
@@ -247,7 +247,7 @@ async def toggle_like(
                 })
                 await chat_manager.send_personal_message(payload, str(post_owner.id))
         except Exception:
-            pass  # Never let notification failure break the like action
+            pass
 
     likes_count = await PostLike.find(PostLike.post_id == post_id).count()
     return {"liked": liked, "likes_count": likes_count}
@@ -292,13 +292,14 @@ async def get_comments(post_id: str):
             user_id=c.user_id,
             user_name=c.user_name,
             text=c.text,
+            parent_comment_id=c.parent_comment_id,
             created_at=c.created_at.isoformat(),
         )
         for c in comments
     ]
 
 
-# ── POST /posts/{post_id}/comments — add a comment ───────────────────────────
+# ── POST /posts/{post_id}/comments — add a comment (or reply) ────────────────
 @router.post("/{post_id}/comments", response_model=CommentResponse)
 async def add_comment(
     post_id: str,
@@ -312,15 +313,21 @@ async def add_comment(
     if not comment_in.text.strip():
         raise HTTPException(status_code=400, detail="Comment cannot be empty")
 
+    # If this is a reply, verify the parent comment exists and belongs to this post
+    if comment_in.parent_comment_id:
+        parent = await PostComment.get(comment_in.parent_comment_id)
+        if not parent or parent.post_id != post_id:
+            raise HTTPException(status_code=404, detail="Parent comment not found")
+
     comment = PostComment(
         post_id=post_id,
         user_id=str(current_user.id),
         user_name=current_user.full_name,
         text=comment_in.text.strip(),
+        parent_comment_id=comment_in.parent_comment_id,
     )
     await comment.insert()
 
-    # Notify post owner — wrapped in try/except so it never breaks comment saving
     try:
         await post.fetch_link(Post.user)
         post_owner = post.user
@@ -338,7 +345,7 @@ async def add_comment(
             })
             await chat_manager.send_personal_message(payload, str(post_owner.id))
     except Exception:
-        pass  # Never let notification failure break comment saving
+        pass
 
     return CommentResponse(
         id=str(comment.id),
@@ -346,5 +353,6 @@ async def add_comment(
         user_id=comment.user_id,
         user_name=comment.user_name,
         text=comment.text,
+        parent_comment_id=comment.parent_comment_id,
         created_at=comment.created_at.isoformat(),
     )

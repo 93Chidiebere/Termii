@@ -37,6 +37,8 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
 
   // Fetch just one preview comment on mount (cheap, no full list)
   useEffect(() => {
@@ -72,16 +74,22 @@ export const PostCard = ({ post, index }: PostCardProps) => {
     }
   };
 
-  const handlePostComment = async (e: React.FormEvent) => {
+  const handlePostComment = async (e: React.FormEvent, parentId?: string) => {
     e.preventDefault();
     if (!newComment.trim()) return;
     setIsPosting(true);
     try {
-      const comment = await addComment(post.id, newComment.trim());
+      const comment = await addComment(post.id, newComment.trim(), parentId);
       setAllComments((prev) => [...prev, comment]);
-      setPreviewComment(comment);
+      if (!parentId) {
+        setPreviewComment(comment);
+      } else {
+        // Auto-expand replies for the parent we just replied to
+        setExpandedReplies((prev) => new Set(prev).add(parentId));
+      }
       setCommentCount((c) => c + 1);
       setNewComment("");
+      setReplyingTo(null);
       if (!expanded) setExpanded(true);
     } catch {
       toast({ title: "Could not post comment. Please try again." });
@@ -309,7 +317,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
                 <ChevronDown size={14} className="rotate-180" /> Hide comments
               </button>
 
-              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+              <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
                 {isLoadingComments ? (
                   <div className="flex items-center justify-center py-4">
                     <Loader2 size={18} className="animate-spin text-primary" />
@@ -317,30 +325,98 @@ export const PostCard = ({ post, index }: PostCardProps) => {
                 ) : allComments.length === 0 ? (
                   <p className="text-sm text-muted-foreground py-2">No comments yet. Be the first!</p>
                 ) : (
-                  allComments.map((c) => (
-                    <div key={c.id}>
-                      <p className="text-sm text-foreground">
-                        <span className="font-semibold">{c.user_name}</span>{" "}
-                        {c.text}
-                      </p>
-                      <p className="text-[11px] text-muted-foreground">
-                        {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
-                      </p>
-                    </div>
-                  ))
+                  allComments
+                    .filter((c) => !c.parent_comment_id)
+                    .map((c) => {
+                      const replies = allComments.filter((r) => r.parent_comment_id === c.id);
+                      const showReplies = expandedReplies.has(c.id);
+                      const isReplyingHere = replyingTo === c.id;
+
+                      return (
+                        <div key={c.id}>
+                          <p className="text-sm text-foreground">
+                            <span className="font-semibold">{c.user_name}</span>{" "}
+                            {c.text}
+                          </p>
+                          <div className="flex items-center gap-3 mt-0.5">
+                            <p className="text-[11px] text-muted-foreground">
+                              {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
+                            </p>
+                            <button
+                              onClick={() => setReplyingTo(isReplyingHere ? null : c.id)}
+                              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+                            >
+                              Reply
+                            </button>
+                          </div>
+
+                          {/* Reply input for this specific comment */}
+                          {isReplyingHere && (
+                            <form
+                              onSubmit={(e) => handlePostComment(e, c.id)}
+                              className="flex items-center gap-2 mt-2 ml-4"
+                            >
+                              <input
+                                autoFocus
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                placeholder={`Reply to ${c.user_name}...`}
+                                className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none border-b border-border pb-1"
+                              />
+                              <button
+                                type="submit"
+                                disabled={!newComment.trim() || isPosting}
+                                className="text-primary disabled:opacity-40"
+                              >
+                                {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                              </button>
+                            </form>
+                          )}
+
+                          {/* Replies — collapsed by default */}
+                          {replies.length > 0 && (
+                            <div className="ml-4 mt-2">
+                              {!showReplies ? (
+                                <button
+                                  onClick={() => setExpandedReplies((prev) => new Set(prev).add(c.id))}
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  — View {replies.length} {replies.length === 1 ? "reply" : "replies"}
+                                </button>
+                              ) : (
+                                <div className="space-y-2">
+                                  {replies.map((r) => (
+                                    <div key={r.id}>
+                                      <p className="text-sm text-foreground">
+                                        <span className="font-semibold">{r.user_name}</span>{" "}
+                                        {r.text}
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        {formatDistanceToNow(new Date(r.created_at + "Z"), { addSuffix: true })}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
                 )}
               </div>
 
-              <form onSubmit={handlePostComment} className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+              <form onSubmit={(e) => handlePostComment(e)} className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
                 <input
-                  value={newComment}
+                  value={replyingTo ? "" : newComment}
                   onChange={(e) => setNewComment(e.target.value)}
                   placeholder="Add a comment..."
-                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none"
+                  disabled={!!replyingTo}
+                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
                 />
                 <button
                   type="submit"
-                  disabled={!newComment.trim() || isPosting}
+                  disabled={!newComment.trim() || isPosting || !!replyingTo}
                   className="text-primary disabled:opacity-40"
                 >
                   {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
