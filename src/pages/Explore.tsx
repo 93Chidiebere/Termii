@@ -193,6 +193,7 @@ const Explore = () => {
           )}
         </div>
       </div>
+      <FloatingCreateButton />
     </AppLayout>
   );
 };
