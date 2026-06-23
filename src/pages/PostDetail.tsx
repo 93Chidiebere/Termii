@@ -165,8 +165,20 @@ const PostDetail = () => {
   return (
     <AppLayout>
       <div className="max-w-4xl mx-auto px-4 py-4">
-        <button onClick={() => navigate(-1)}
-          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4">
+
+        <button
+          onClick={() => {
+            // If the user arrived from within the app, go back normally.
+            // If they arrived from an external link (WhatsApp, Facebook, etc.),
+            // there's no real in-app history to go back to, so send them to the feed.
+            if (window.history.state && window.history.state.idx > 0) {
+              navigate(-1);
+            } else {
+              navigate("/feed");
+            }
+          }}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4"
+        >
           <ArrowLeft size={18} /> Back
         </button>
 
