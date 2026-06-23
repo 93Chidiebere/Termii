@@ -10,6 +10,8 @@ import { useEffect } from "react";
 import { useFollowStore } from "@/stores/followStore";
 import { useAuthStore } from "@/stores/authStore";
 import { useGlobalSocket } from "@/hooks/useGlobalSocket";
+import { getMe } from "@/lib/api";
+import { useRoleStore } from "@/stores/roleStore";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -42,6 +44,12 @@ const App = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadMyFollowing();
+      // Re-sync admin status on page load/refresh since roleStore doesn't persist
+      getMe().then((profile) => {
+        useRoleStore.getState().setIsAdmin(profile.is_admin ?? false);
+      }).catch(() => {
+        // Token may be expired — ProtectedRoute will handle redirect
+      });
     }
   }, [isAuthenticated]);
 

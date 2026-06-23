@@ -3,28 +3,20 @@ import { create } from "zustand";
 type UserRole = "user" | "admin" | "moderator";
 
 interface RoleState {
-  roles: Record<string, UserRole[]>;
-  hasRole: (userId: string, role: UserRole) => boolean;
-  addRole: (userId: string, role: UserRole) => void;
-  removeRole: (userId: string, role: UserRole) => void;
+  isAdmin: boolean;
+  setIsAdmin: (value: boolean) => void;
+  hasRole: (userId: string | undefined, role: UserRole) => boolean;
 }
 
-// Mock: user "1" (Uju) is admin
 export const useRoleStore = create<RoleState>((set, get) => ({
-  roles: {
-    "1": ["admin", "user"],
-    "2": ["user"],
+  isAdmin: false,
+
+  setIsAdmin: (value: boolean) => set({ isAdmin: value }),
+
+  // hasRole now just checks the real isAdmin flag for the "admin" role.
+  // userId param kept for backwards compatibility with existing call sites.
+  hasRole: (_userId, role) => {
+    if (role === "admin") return get().isAdmin;
+    return false;
   },
-  hasRole: (userId, role) => get().roles[userId]?.includes(role) ?? false,
-  addRole: (userId, role) =>
-    set((state) => {
-      const current = state.roles[userId] || [];
-      if (current.includes(role)) return state;
-      return { roles: { ...state.roles, [userId]: [...current, role] } };
-    }),
-  removeRole: (userId, role) =>
-    set((state) => {
-      const current = state.roles[userId] || [];
-      return { roles: { ...state.roles, [userId]: current.filter((r) => r !== role) } };
-    }),
 }));

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { loginUser, registerUser, getMe } from "@/lib/api";
+import { useRoleStore } from "@/stores/roleStore";
 import type { User } from "@/data/mockData";
 
 interface SignupData {
@@ -77,6 +78,10 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             error: null,
           });
+
+          // Sync admin status from the real backend field
+          useRoleStore.getState().setIsAdmin(profile.is_admin ?? false);
+
         } catch (err: unknown) {
           let message = "Login failed. Please check your email and password.";
           if (
