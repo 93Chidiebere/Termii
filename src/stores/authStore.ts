@@ -62,7 +62,7 @@ export const useAuthStore = create<AuthState>()(
             email: profile.email,
             name: profile.full_name,
             displayName: profile.full_name,
-            username: profile.email.split("@")[0],
+            username: profile.username || profile.email.split("@")[0],
             avatar: profile.avatar_url || "",
             hairType: profile.hair_type || "",
             bio: "",
@@ -107,6 +107,7 @@ export const useAuthStore = create<AuthState>()(
             full_name: signupData.displayName || "",
             email: signupData.email || "",
             password: signupData.password || "",
+            username: signupData.username || undefined,
             hair_type: signupData.hairType,
           });
           // After registering, log in automatically — this also calls getMe()

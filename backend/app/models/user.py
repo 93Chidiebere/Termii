@@ -7,6 +7,7 @@ class User(Document):
     email: Indexed(str, unique=True)
     hashed_password: Optional[str] = None
     full_name: str
+    username: Optional[Indexed(str, unique=True)] = None
     avatar_url: Optional[str] = None
     hair_type: Optional[Indexed(str)] = None
 

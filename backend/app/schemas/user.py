@@ -5,12 +5,14 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+    username: Optional[str] = None
     hair_type: Optional[str] = None
 
 class UserResponse(BaseModel):
     id: Optional[str] = None
     email: EmailStr
     full_name: str
+    username: Optional[str] = None
     avatar_url: Optional[str] = None
     hair_type: Optional[str] = None
     is_admin: bool = False
@@ -37,6 +39,7 @@ class UserResponse(BaseModel):
             id=str(user.id),
             email=user.email,
             full_name=user.full_name,
+            username=getattr(user, "username", None),
             avatar_url=user.avatar_url,
             hair_type=user.hair_type,
             is_admin=user.is_admin,

@@ -35,12 +35,19 @@ async def register(user_in: UserCreate):
     existing_user = await User.find_one(User.email == user_in.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Check username uniqueness if provided
+    if user_in.username:
+        existing_username = await User.find_one(User.username == user_in.username)
+        if existing_username:
+            raise HTTPException(status_code=400, detail="Username already taken")
 
     hashed_pwd = get_password_hash(user_in.password)
     user = User(
         email=user_in.email,
         hashed_password=hashed_pwd,
         full_name=user_in.full_name,
+        username=user_in.username,
         hair_type=user_in.hair_type,
     )
     await user.insert()
