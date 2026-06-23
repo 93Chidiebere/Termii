@@ -410,3 +410,30 @@ export const verifySeller = async (
   const response = await apiClient.put(`/sellers/${userId}/verify`, { approve, notes });
   return response.data;
 };
+
+// ── Admin: User Management ───────────────────────────────────────────────────
+
+export interface AdminUserData {
+  id: string;
+  full_name: string;
+  email: string;
+  avatar_url?: string;
+  status: string;
+  is_admin: boolean;
+  suspension_reason?: string;
+  created_at: string;
+}
+
+export const getAllUsers = async (): Promise<AdminUserData[]> => {
+  const response = await apiClient.get("/admin/users");
+  return response.data;
+};
+
+export const updateUserStatus = async (
+  userId: string,
+  status: "active" | "suspended" | "banned",
+  reason?: string
+) => {
+  const response = await apiClient.put(`/admin/users/${userId}/status`, { status, reason });
+  return response.data;
+};

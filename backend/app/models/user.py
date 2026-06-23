@@ -29,6 +29,8 @@ class User(Document):
     verification_status: str = "unverified"  # "unverified" | "pending" | "verified"
 
     is_admin: bool = False
+    status: str = "active"  # "active" | "suspended" | "banned"
+    suspension_reason: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
     class Settings:

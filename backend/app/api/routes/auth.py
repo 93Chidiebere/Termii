@@ -54,6 +54,15 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
+    if getattr(user, "status", "active") == "banned":
+        raise HTTPException(status_code=403, detail="This account has been banned.")
+    if getattr(user, "status", "active") == "suspended":
+        reason = getattr(user, "suspension_reason", None)
+        detail = "This account is suspended."
+        if reason:
+            detail += f" Reason: {reason}"
+        raise HTTPException(status_code=403, detail=detail)
+
     access_token = create_access_token(data={"sub": user.email})
     return {"access_token": access_token, "token_type": "bearer"}
 

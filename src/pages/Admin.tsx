@@ -13,7 +13,10 @@ import {
   mockAdminUsers, mockCreatorRequests, mockFlaggedPosts,
   type AdminUser, type CreatorRequest, type FlaggedPost, type UserStatus,
 } from "@/data/mockAdminData";
-import { getPendingSellers, verifySeller, type PendingSeller } from "@/lib/api";
+import {
+  getPendingSellers, verifySeller, type PendingSeller,
+  getAllUsers, updateUserStatus, type AdminUserData,
+} from "@/lib/api";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -106,18 +109,44 @@ const AdminPanel = () => {
 };
 
 /* ====== USERS TAB ====== */
+
+/* ====== USERS TAB ====== */
 const UsersTab = () => {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<UserStatus | "all">("all");
-  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "suspended" | "banned">("all");
+  const [users, setUsers] = useState<AdminUserData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedUser, setSelectedUser] = useState<AdminUserData | null>(null);
 
-  const filtered = mockAdminUsers.filter((u) => {
-    const matchSearch = u.displayName.toLowerCase().includes(search.toLowerCase()) ||
-      u.username.toLowerCase().includes(search.toLowerCase()) ||
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getAllUsers();
+      setUsers(data);
+    } catch {
+      // silently fail — empty state shown
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const filtered = users.filter((u) => {
+    const matchSearch =
+      u.full_name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase());
     const matchStatus = statusFilter === "all" || u.status === statusFilter;
     return matchSearch && matchStatus;
   });
+
+  const statusStyle: Record<string, string> = {
+    active: "bg-green-500/10 text-green-600",
+    suspended: "bg-yellow-500/10 text-yellow-600",
+    banned: "bg-destructive/10 text-destructive",
+  };
 
   return (
     <div>
@@ -141,33 +170,43 @@ const UsersTab = () => {
         </div>
       </div>
 
-      <div className="bg-card border border-border rounded-xl overflow-hidden">
-        <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 p-3 border-b border-border text-xs font-semibold text-muted-foreground uppercase">
-          <span>User</span><span>Email</span><span>Status</span><span>Reports</span><span></span>
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-primary" />
         </div>
-        {filtered.map((u) => (
-          <button key={u.id} onClick={() => setSelectedUser(u)}
-            className="w-full grid grid-cols-[1fr_auto] sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 p-3 items-center hover:bg-muted/50 transition-colors text-left border-b border-border last:border-0"
-          >
-            <div className="flex items-center gap-3">
-              <img src={u.avatar} alt="" className="w-9 h-9 rounded-full object-cover" />
-              <div>
-                <p className="text-sm font-semibold text-foreground">{u.displayName}</p>
-                <p className="text-xs text-muted-foreground">@{u.username}</p>
+      ) : (
+        <div className="bg-card border border-border rounded-xl overflow-hidden">
+          <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_auto] gap-4 p-3 border-b border-border text-xs font-semibold text-muted-foreground uppercase">
+            <span>User</span><span>Email</span><span>Status</span><span></span>
+          </div>
+          {filtered.map((u) => (
+            <button key={u.id} onClick={() => setSelectedUser(u)}
+              className="w-full grid grid-cols-[1fr_auto] sm:grid-cols-[2fr_1fr_1fr_auto] gap-4 p-3 items-center hover:bg-muted/50 transition-colors text-left border-b border-border last:border-0"
+            >
+              <div className="flex items-center gap-3">
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} alt="" className="w-9 h-9 rounded-full object-cover" />
+                ) : (
+                  <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center">
+                    <span className="text-xs font-bold text-primary">{u.full_name[0]?.toUpperCase()}</span>
+                  </div>
+                )}
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{u.full_name}</p>
+                  {u.is_admin && <p className="text-[10px] text-primary font-semibold">ADMIN</p>}
+                </div>
               </div>
-            </div>
-            <p className="text-xs text-muted-foreground hidden sm:block">{u.email}</p>
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full w-fit hidden sm:block ${statusBadge[u.status].className}`}>
-              {statusBadge[u.status].label}
-            </span>
-            <p className="text-xs text-muted-foreground hidden sm:block">{u.reportCount}</p>
-            <ChevronRight size={16} className="text-muted-foreground" />
-          </button>
-        ))}
-        {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No users found</p>}
-      </div>
+              <p className="text-xs text-muted-foreground hidden sm:block">{u.email}</p>
+              <span className={`text-xs font-semibold px-2 py-1 rounded-full w-fit hidden sm:block ${statusStyle[u.status]}`}>
+                {u.status.charAt(0).toUpperCase() + u.status.slice(1)}
+              </span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
+          ))}
+          {filtered.length === 0 && <p className="text-sm text-muted-foreground text-center py-8">No users found</p>}
+        </div>
+      )}
 
-      {/* User detail dialog */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
@@ -177,17 +216,35 @@ const UsersTab = () => {
           {selectedUser && (
             <div className="space-y-4">
               <div className="flex items-center gap-3">
-                <img src={selectedUser.avatar} alt="" className="w-14 h-14 rounded-full object-cover" />
+                {selectedUser.avatar_url ? (
+                  <img src={selectedUser.avatar_url} alt="" className="w-14 h-14 rounded-full object-cover" />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center">
+                    <span className="text-lg font-bold text-primary">{selectedUser.full_name[0]?.toUpperCase()}</span>
+                  </div>
+                )}
                 <div>
-                  <p className="font-semibold text-foreground">{selectedUser.displayName}</p>
-                  <p className="text-xs text-muted-foreground">@{selectedUser.username}</p>
+                  <p className="font-semibold text-foreground">{selectedUser.full_name}</p>
+                  <p className="text-xs text-muted-foreground">{selectedUser.email}</p>
                 </div>
               </div>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="text-foreground">{selectedUser.email}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className={`font-semibold px-2 py-0.5 rounded-full text-xs ${statusBadge[selectedUser.status].className}`}>{statusBadge[selectedUser.status].label}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Joined</span><span className="text-foreground">{selectedUser.joinedAt}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">Reports</span><span className="text-foreground">{selectedUser.reportCount}</span></div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Status</span>
+                  <span className={`font-semibold px-2 py-0.5 rounded-full text-xs ${statusStyle[selectedUser.status]}`}>
+                    {selectedUser.status}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Joined</span>
+                  <span className="text-foreground">{new Date(selectedUser.created_at).toLocaleDateString()}</span>
+                </div>
+                {selectedUser.suspension_reason && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Reason</span>
+                    <span className="text-foreground">{selectedUser.suspension_reason}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -196,6 +253,7 @@ const UsersTab = () => {
     </div>
   );
 };
+
 
 /* ====== CREATORS TAB ====== */
 const CreatorsTab = () => {
@@ -545,40 +603,92 @@ const SellersTab = () => {
 };
 
 /* ====== SUSPEND/BAN TAB ====== */
+/* ====== SUSPEND/BAN TAB ====== */
 const SuspendBanTab = () => {
-  const [users, setUsers] = useState(mockAdminUsers);
-  const [actionModal, setActionModal] = useState<{ user: AdminUser; action: "suspend" | "ban" } | null>(null);
+  const [users, setUsers] = useState<AdminUserData[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionModal, setActionModal] = useState<{ user: AdminUserData; action: "suspend" | "ban" } | null>(null);
   const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const { toast } = useToast();
 
-  const handleAction = () => {
+  const loadUsers = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getAllUsers();
+      setUsers(data);
+    } catch {
+      // silently fail
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const handleAction = async () => {
     if (!actionModal || !reason.trim()) return;
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === actionModal.user.id
-          ? { ...u, status: actionModal.action === "suspend" ? "suspended" as const : "banned" as const }
-          : u
-      )
-    );
-    setActionModal(null);
-    setReason("");
+    setIsSubmitting(true);
+    try {
+      const status = actionModal.action === "suspend" ? "suspended" : "banned";
+      await updateUserStatus(actionModal.user.id, status, reason.trim());
+      setUsers((prev) =>
+        prev.map((u) => (u.id === actionModal.user.id ? { ...u, status, suspension_reason: reason.trim() } : u))
+      );
+      toast({ title: `User ${status}`, description: `${actionModal.user.full_name} has been ${status}.` });
+      setActionModal(null);
+      setReason("");
+    } catch {
+      toast({ title: "Could not update user status", variant: "destructive" });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleRestore = (userId: string) => {
-    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, status: "active" as const } : u));
+  const handleRestore = async (u: AdminUserData) => {
+    try {
+      await updateUserStatus(u.id, "active");
+      setUsers((prev) => prev.map((x) => (x.id === u.id ? { ...x, status: "active", suspension_reason: undefined } : x)));
+      toast({ title: "User restored", description: `${u.full_name}'s account is active again.` });
+    } catch {
+      toast({ title: "Could not restore user", variant: "destructive" });
+    }
   };
+
+  const statusStyle: Record<string, string> = {
+    active: "bg-green-500/10 text-green-600",
+    suspended: "bg-yellow-500/10 text-yellow-600",
+    banned: "bg-destructive/10 text-destructive",
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <Loader2 size={24} className="animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div>
       <div className="space-y-2">
         {users.map((u) => (
           <div key={u.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
-            <img src={u.avatar} alt="" className="w-10 h-10 rounded-full object-cover" />
+            {u.avatar_url ? (
+              <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover" />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                <span className="text-sm font-bold text-primary">{u.full_name[0]?.toUpperCase()}</span>
+              </div>
+            )}
             <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">{u.displayName}</p>
-              <p className="text-xs text-muted-foreground">@{u.username}</p>
+              <p className="text-sm font-semibold text-foreground">{u.full_name}</p>
+              <p className="text-xs text-muted-foreground">{u.email}</p>
             </div>
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusBadge[u.status].className}`}>
-              {statusBadge[u.status].label}
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${statusStyle[u.status]}`}>
+              {u.status.charAt(0).toUpperCase() + u.status.slice(1)}
             </span>
             {u.status === "active" ? (
               <div className="flex gap-1.5">
@@ -594,7 +704,7 @@ const SuspendBanTab = () => {
                 </button>
               </div>
             ) : (
-              <button onClick={() => handleRestore(u.id)}
+              <button onClick={() => handleRestore(u)}
                 className="px-3 py-1.5 rounded-lg bg-green-500/10 text-green-600 text-xs font-semibold hover:bg-green-500/20 transition-colors"
               >
                 Restore
@@ -604,7 +714,6 @@ const SuspendBanTab = () => {
         ))}
       </div>
 
-      {/* Action modal with reason */}
       <Dialog open={!!actionModal} onOpenChange={() => { setActionModal(null); setReason(""); }}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
@@ -613,8 +722,8 @@ const SuspendBanTab = () => {
             </DialogTitle>
             <DialogDescription>
               {actionModal?.action === "suspend"
-                ? `Temporarily suspend ${actionModal?.user.displayName}'s account.`
-                : `Permanently ban ${actionModal?.user.displayName} from the platform.`}
+                ? `Temporarily suspend ${actionModal?.user.full_name}'s account. They won't be able to log in.`
+                : `Permanently ban ${actionModal?.user.full_name} from the platform. They won't be able to log in.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
@@ -627,14 +736,16 @@ const SuspendBanTab = () => {
                 className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
               />
             </div>
-            <button onClick={handleAction} disabled={!reason.trim()}
-              className={`w-full py-3 rounded-xl font-semibold text-sm transition-opacity disabled:opacity-40 ${
+            <button onClick={handleAction} disabled={!reason.trim() || isSubmitting}
+              className={`w-full py-3 rounded-xl font-semibold text-sm transition-opacity disabled:opacity-40 flex items-center justify-center gap-2 ${
                 actionModal?.action === "ban"
                   ? "bg-destructive text-destructive-foreground hover:opacity-90"
                   : "bg-yellow-500 text-white hover:opacity-90"
               }`}
             >
-              {actionModal?.action === "suspend" ? "Suspend User" : "Ban User"}
+              {isSubmitting ? (
+                <><Loader2 size={16} className="animate-spin" /> Processing...</>
+              ) : actionModal?.action === "suspend" ? "Suspend User" : "Ban User"}
             </button>
           </div>
         </DialogContent>
@@ -642,6 +753,7 @@ const SuspendBanTab = () => {
     </div>
   );
 };
+
 
 /* ====== BRANDING TAB ====== */
 const BrandingTab = () => {
