@@ -3,7 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, List
 from app.models.user import User
 from app.services import paystack
-from app.api.routes.auth import get_current_user, get_current_admin
+from app.api.routes.auth import get_current_user
+from app.api.dependencies import get_current_admin
 
 router = APIRouter()
 
