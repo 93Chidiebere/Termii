@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Search, ShoppingBag, PlusSquare, MessageCircle, Users, Bell, User } from "lucide-react";
+import { Home, Search, ShoppingBag, MessageCircle, Users, Bell, User } from "lucide-react";
 import { useNotificationStore } from "@/stores/notificationStore";
 import { useMessageStore } from "@/stores/messageStore";
 
@@ -7,7 +7,6 @@ const navItems = [
   { to: "/feed", icon: Home, label: "Home" },
   { to: "/explore", icon: Search, label: "Explore" },
   { to: "/marketplace", icon: ShoppingBag, label: "Shop" },
-  { to: "/create", icon: PlusSquare, label: "Create" },
   { to: "/hair-twins", icon: Users, label: "Twins" },
   { to: "/messages", icon: MessageCircle, label: "Chat" },
   { to: "/activity", icon: Bell, label: "Alerts" },

@@ -5,6 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { getPosts } from "@/lib/api";
 import { Loader2 } from "lucide-react";
+import { FloatingCreateButton } from "@/components/feed/FloatingCreateButton";
 
 const Index = () => {
   const { isMuted, isBlocked } = useBlockMuteStore();
@@ -77,6 +78,7 @@ const Index = () => {
           </div>
         )}
       </div>
+      <FloatingCreateButton />
     </AppLayout>
   );
 };

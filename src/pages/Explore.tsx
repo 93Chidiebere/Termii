@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { trendingTags, hairCategories } from "@/data/mockData";
 import { getPosts } from "@/lib/api";
 import type { Post } from "@/types";
+import { FloatingCreateButton } from "@/components/feed/FloatingCreateButton";
 
 const Explore = () => {
   const [activeTag, setActiveTag] = useState<string | null>(null);
