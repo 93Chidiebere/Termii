@@ -11,6 +11,8 @@ import { toggleLike, toggleSave, getComments, addComment, type ApiComment } from
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
+import { generateShareCard } from "@/lib/generateShareCard";
+import { Image as ImageIcon } from "lucide-react";
 
 interface PostCardProps {
   post: Post;
@@ -37,6 +39,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [newComment, setNewComment] = useState("");
   const [isPosting, setIsPosting] = useState(false);
+  const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
 
@@ -140,6 +143,50 @@ export const PostCard = ({ post, index }: PostCardProps) => {
     const url = `${window.location.origin}/post/${post.id}`;
     navigator.clipboard?.writeText(url).catch(() => {});
     toast({ title: "Link copied", description: "Post link copied to clipboard." });
+  };
+
+  const handleShareAsCard = async () => {
+    if (!post.image || isVideo) {
+      toast({ title: "Card sharing is only available for photo posts right now." });
+      return;
+    }
+
+    setIsGeneratingCard(true);
+    try {
+      const blob = await generateShareCard({
+        imageUrl: post.image,
+        userName: post.user.displayName,
+        userAvatarUrl: post.user.avatar,
+        caption: post.caption,
+      });
+
+      const file = new File([blob], "termii-africa-post.jpg", { type: "image/jpeg" });
+
+      // Try native share sheet first (mobile)
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: "Termii Africa",
+          text: `Check out ${post.user.displayName}'s post on Termii Africa! ${window.location.origin}/post/${post.id}`,
+        });
+      } else {
+        // Fallback: download the image (desktop)
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "termii-africa-post.jpg";
+        a.click();
+        URL.revokeObjectURL(url);
+        toast({
+          title: "Card downloaded!",
+          description: "Share it on Instagram, Facebook, or X.",
+        });
+      }
+    } catch {
+      toast({ title: "Could not generate share card. Please try again." });
+    } finally {
+      setIsGeneratingCard(false);
+    }
   };
 
   return (
@@ -251,9 +298,38 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             <button onClick={handleToggleExpand} aria-label="Toggle comments">
               <MessageCircle size={24} className="text-foreground" strokeWidth={1.5} />
             </button>
-            <button onClick={handleShare} aria-label="Share post">
-              <Share2 size={22} className="text-foreground" strokeWidth={1.5} />
-            </button>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <button aria-label="Share post">
+                  <Share2 size={22} className="text-foreground" strokeWidth={1.5} />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-56 p-1.5 rounded-xl">
+                <button
+                  onClick={handleShare}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left"
+                >
+                  <Share2 size={16} className="text-muted-foreground" />
+                  Copy link
+                </button>
+                {!isVideo && post.image && (
+                  <button
+                    onClick={handleShareAsCard}
+                    disabled={isGeneratingCard}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left disabled:opacity-60"
+                  >
+                    {isGeneratingCard ? (
+                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                    ) : (
+                      <ImageIcon size={16} className="text-muted-foreground" />
+                    )}
+                    Share as image card
+                  </button>
+                )}
+              </PopoverContent>
+            </Popover>
+
           </div>
           <button
             onClick={handleSave}
