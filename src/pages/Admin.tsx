@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
+
 import {
   Users, ShieldCheck, Flag, Ban, Search, ChevronRight,
   CheckCircle, XCircle, Clock, AlertTriangle, ExternalLink, ArrowLeft,
-  Image as ImageIcon, Upload, RotateCcw, BadgeCheck, Loader2, Building2, User as UserIcon,
+  Image as ImageIcon, Upload, RotateCcw, BadgeCheck, Loader2, Building2,
+  User as UserIcon, FileText, Plus, Pin, PinOff, Trash2,
 } from "lucide-react";
+
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useRoleStore } from "@/stores/roleStore";
@@ -29,12 +32,16 @@ import {
   generateFaviconFromFile, loadStoredFavicon, clearFavicon,
 } from "@/lib/favicon";
 
-type AdminTab = "users" | "creators" | "sellers" | "flagged" | "suspend" | "branding";
+import { BlogEditor } from "@/components/admin/BlogEditor";
+import { getAllBlogPostsAdmin, deleteBlogPost, pinBlogPost, unpinBlogPost, type BlogPost } from "@/lib/api";
+
+type AdminTab = "users" | "creators" | "sellers" | "blog" | "flagged" | "suspend" | "branding";
 
 const tabs: { value: AdminTab; label: string; icon: React.ElementType }[] = [
   { value: "users", label: "Users", icon: Users },
   { value: "creators", label: "Creators", icon: ShieldCheck },
   { value: "sellers", label: "Sellers", icon: BadgeCheck },
+  { value: "blog", label: "Blog", icon: FileText },
   { value: "flagged", label: "Flagged", icon: Flag },
   { value: "suspend", label: "Suspend/Ban", icon: Ban },
   { value: "branding", label: "Branding", icon: ImageIcon },
@@ -99,6 +106,7 @@ const AdminPanel = () => {
           {activeTab === "users" && <UsersTab />}
           {activeTab === "creators" && <CreatorsTab />}
           {activeTab === "sellers" && <SellersTab />}
+          {activeTab === "blog" && <BlogTab />}
           {activeTab === "flagged" && <FlaggedTab />}
           {activeTab === "suspend" && <SuspendBanTab />}
           {activeTab === "branding" && <BrandingTab />}
@@ -107,8 +115,6 @@ const AdminPanel = () => {
     </div>
   );
 };
-
-/* ====== USERS TAB ====== */
 
 /* ====== USERS TAB ====== */
 const UsersTab = () => {
@@ -441,6 +447,141 @@ const FlaggedTab = () => {
     </div>
   );
 };
+
+/* ====== BLOG TAB ====== */
+const BlogTab = () => {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [editingPostId, setEditingPostId] = useState<string | null | "new">(null);
+  const { toast } = useToast();
+
+  const loadPosts = async () => {
+    setIsLoading(true);
+    try {
+      const data = await getAllBlogPostsAdmin();
+      setPosts(data);
+    } catch {
+      toast({ title: "Could not load blog posts", variant: "destructive" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  const handleDelete = async (postId: string) => {
+    if (!window.confirm("Delete this post permanently?")) return;
+    try {
+      await deleteBlogPost(postId);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      toast({ title: "Post deleted" });
+    } catch {
+      toast({ title: "Could not delete post", variant: "destructive" });
+    }
+  };
+
+  const handleTogglePin = async (post: BlogPost) => {
+    try {
+      if (post.is_pinned) {
+        await unpinBlogPost(post.id);
+      } else {
+        await pinBlogPost(post.id);
+      }
+      loadPosts();
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || "Could not update pin status";
+      toast({ title: message, variant: "destructive" });
+    }
+  };
+
+  const pinnedCount = posts.filter((p) => p.is_pinned).length;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="font-display text-lg font-semibold text-foreground">
+          Blog Posts ({posts.length})
+        </h2>
+        <button
+          onClick={() => setEditingPostId("new")}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
+        >
+          <Plus size={16} /> New Post
+        </button>
+      </div>
+
+      <p className="text-xs text-muted-foreground mb-4">
+        {pinnedCount}/5 posts pinned
+      </p>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 size={24} className="animate-spin text-primary" />
+        </div>
+      ) : posts.length === 0 ? (
+        <div className="bg-card border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
+          No blog posts yet. Click "New Post" to write your first one.
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {posts.map((post) => (
+            <div key={post.id} className="bg-card border border-border rounded-xl p-4 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <p className="text-sm font-semibold text-foreground truncate">{post.title}</p>
+                  {post.is_pinned && <Pin size={12} className="text-primary flex-shrink-0" />}
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                    post.status === "published"
+                      ? "bg-green-500/10 text-green-600"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {post.status === "published" ? "Published" : "Draft"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(post.updated_at).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => handleTogglePin(post)}
+                disabled={!post.is_pinned && pinnedCount >= 5}
+                className="p-2 rounded-lg hover:bg-muted transition-colors disabled:opacity-30"
+                title={post.is_pinned ? "Unpin" : "Pin to top"}
+              >
+                {post.is_pinned ? <Pin size={16} className="text-primary" /> : <PinOff size={16} className="text-muted-foreground" />}
+              </button>
+              <button
+                onClick={() => setEditingPostId(post.id)}
+                className="px-3 py-1.5 rounded-lg bg-secondary text-secondary-foreground text-xs font-semibold hover:bg-secondary/80 transition-colors"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(post.id)}
+                className="p-2 rounded-lg hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 size={16} className="text-destructive" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {editingPostId !== null && (
+        <BlogEditor
+          postId={editingPostId === "new" ? null : editingPostId}
+          onClose={() => setEditingPostId(null)}
+          onSaved={loadPosts}
+        />
+      )}
+    </div>
+  );
+};
+
 
 /* ====== SELLERS TAB ====== */
 const SellersTab = () => {

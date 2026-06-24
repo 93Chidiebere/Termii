@@ -438,3 +438,71 @@ export const updateUserStatus = async (
   const response = await apiClient.put(`/admin/users/${userId}/status`, { status, reason });
   return response.data;
 };
+
+// ── Blog (Admin) ──────────────────────────────────────────────────────────────
+
+export interface BlogBlock {
+  type: "text" | "image";
+  content: string;
+  is_thumbnail: boolean;
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  summary: string;
+  blocks: BlogBlock[];
+  author_name: string;
+  status: "draft" | "published";
+  is_pinned: boolean;
+  pinned_order?: number;
+  created_at: string;
+  updated_at: string;
+  published_at?: string;
+}
+
+export interface BlogPostInput {
+  title: string;
+  summary: string;
+  blocks: BlogBlock[];
+  status: "draft" | "published";
+}
+
+export const getAllBlogPostsAdmin = async (): Promise<BlogPost[]> => {
+  const response = await apiClient.get("/blog/admin");
+  return response.data;
+};
+
+export const getBlogPostForEdit = async (postId: string): Promise<BlogPost> => {
+  const response = await apiClient.get(`/blog/admin/${postId}`);
+  return response.data;
+};
+
+export const createBlogPost = async (data: BlogPostInput): Promise<BlogPost> => {
+  const response = await apiClient.post("/blog/", data);
+  return response.data;
+};
+
+export const updateBlogPost = async (
+  postId: string,
+  data: Partial<BlogPostInput>
+): Promise<BlogPost> => {
+  const response = await apiClient.put(`/blog/${postId}`, data);
+  return response.data;
+};
+
+export const deleteBlogPost = async (postId: string) => {
+  const response = await apiClient.delete(`/blog/${postId}`);
+  return response.data;
+};
+
+export const pinBlogPost = async (postId: string): Promise<BlogPost> => {
+  const response = await apiClient.put(`/blog/${postId}/pin`);
+  return response.data;
+};
+
+export const unpinBlogPost = async (postId: string): Promise<BlogPost> => {
+  const response = await apiClient.put(`/blog/${postId}/unpin`);
+  return response.data;
+};
