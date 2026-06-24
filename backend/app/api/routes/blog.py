@@ -11,6 +11,23 @@ from app.api.dependencies import get_current_admin
 router = APIRouter()
 
 
+def add_watermark(image_url: str) -> str:
+    """
+    Inserts a Cloudinary overlay transformation into an existing Cloudinary URL
+    to add the Termii Africa logo watermark, bottom-right, semi-transparent.
+    """
+    if "res.cloudinary.com" not in image_url:
+        return image_url  # not a Cloudinary URL, can't transform it
+
+    watermark_public_id = "Termii_Africa_logo_evpfzt"
+    transformation = f"l_{watermark_public_id},w_200,o_70,g_south_east,x_20,y_20/fl_layer_apply"
+
+    # Insert the transformation right after "/upload/" in the URL
+    parts = image_url.split("/upload/")
+    if len(parts) != 2:
+        return image_url
+    return f"{parts[0]}/upload/{transformation}/{parts[1]}"
+
 def slugify(title: str) -> str:
     slug = title.lower().strip()
     slug = re.sub(r"[^a-z0-9\s-]", "", slug)
@@ -51,8 +68,7 @@ class BlogPostUpdate(BaseModel):
             raise ValueError("Summary must be 500 characters or fewer")
         return v
 
-
-class BlogPostResponse(BaseModel):
+    class BlogPostResponse(BaseModel):
     id: str
     title: str
     slug: str
@@ -65,7 +81,7 @@ class BlogPostResponse(BaseModel):
     created_at: str
     updated_at: str
     published_at: Optional[str] = None
-
+    og_image: Optional[str] = None
 
 def to_response(post: BlogPost) -> BlogPostResponse:
     return BlogPostResponse(
@@ -81,6 +97,7 @@ def to_response(post: BlogPost) -> BlogPostResponse:
         created_at=post.created_at.isoformat(),
         updated_at=post.updated_at.isoformat(),
         published_at=post.published_at.isoformat() if post.published_at else None,
+        og_image=post.og_image,
     )
 
 
@@ -97,6 +114,15 @@ async def create_post(
         slug = f"{base_slug}-{counter}"
         counter += 1
 
+    
+    og_image = None
+    if post_in.status == "published":
+        thumbnail_block = next((b for b in post_in.blocks if b.type == "image" and b.is_thumbnail), None)
+        if not thumbnail_block:
+            thumbnail_block = next((b for b in post_in.blocks if b.type == "image"), None)
+        if thumbnail_block:
+            og_image = add_watermark(thumbnail_block.content)
+
     post = BlogPost(
         title=post_in.title,
         slug=slug,
@@ -106,6 +132,7 @@ async def create_post(
         author_name=admin.full_name,
         status=post_in.status,
         published_at=datetime.utcnow() if post_in.status == "published" else None,
+        og_image=og_image,
     )
     await post.insert()
     return to_response(post)
@@ -144,9 +171,16 @@ async def update_post(
         post.summary = update.summary
     if update.blocks is not None:
         post.blocks = [BlogBlock(type=b.type, content=b.content, is_thumbnail=b.is_thumbnail) for b in update.blocks]
+
     if update.status is not None:
         if update.status == "published" and post.status != "published":
             post.published_at = datetime.utcnow()
+            # Generate a watermarked OG image from the thumbnail
+            thumbnail_block = next((b for b in post.blocks if b.type == "image" and b.is_thumbnail), None)
+            if not thumbnail_block:
+                thumbnail_block = next((b for b in post.blocks if b.type == "image"), None)
+            if thumbnail_block:
+                post.og_image = add_watermark(thumbnail_block.content)
         post.status = update.status
 
     post.updated_at = datetime.utcnow()

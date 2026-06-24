@@ -23,6 +23,7 @@ class BlogPost(Document):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
     published_at: Optional[datetime] = None
+    og_image: Optional[str] = None
 
     class Settings:
         name = "blog_posts"
