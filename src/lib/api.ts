@@ -506,3 +506,13 @@ export const unpinBlogPost = async (postId: string): Promise<BlogPost> => {
   const response = await apiClient.put(`/blog/${postId}/unpin`);
   return response.data;
 };
+
+export const getPublishedBlogPosts = async (): Promise<BlogPost[]> => {
+  const response = await apiClient.get("/blog/");
+  return response.data;
+};
+
+export const getBlogPostBySlug = async (slug: string): Promise<BlogPost> => {
+  const response = await apiClient.get(`/blog/${slug}`);
+  return response.data;
+};

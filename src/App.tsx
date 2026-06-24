@@ -33,6 +33,7 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const OrderCallback = lazy(() => import("./pages/OrderCallback"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Blog = lazy(() => import("./pages/Blog"));
+const BlogPostDetail = lazy(() => import("./pages/BlogPostDetail"));
 
 const queryClient = new QueryClient();
 
@@ -85,6 +86,7 @@ const App = () => {
             <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
             <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
             <Route path="/blog" element={<Blog />} />
+            <Route path="/blog/:slug" element={<BlogPostDetail />} />
             <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
