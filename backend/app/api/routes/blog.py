@@ -68,7 +68,7 @@ class BlogPostUpdate(BaseModel):
             raise ValueError("Summary must be 500 characters or fewer")
         return v
 
-    class BlogPostResponse(BaseModel):
+class BlogPostResponse(BaseModel):
     id: str
     title: str
     slug: str
