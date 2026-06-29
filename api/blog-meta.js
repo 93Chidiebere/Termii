@@ -1,3 +1,6 @@
+import { readFileSync } from "fs";
+import { join } from "path";
+
 export default async function handler(req, res) {
   const userAgent = req.headers["user-agent"] || "";
   const isCrawler = /facebookexternalhit|Twitterbot|WhatsApp|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest/i.test(userAgent);
@@ -5,9 +8,18 @@ export default async function handler(req, res) {
   const slug = req.query.slug;
 
   if (!isCrawler || !slug) {
-    // Not a crawler, or no slug — just redirect to the real app
-    res.writeHead(302, { Location: `/blog/${slug || ""}` });
-    res.end();
+    // Real user — serve the actual SPA shell directly, do NOT redirect
+    // (redirecting back to /blog/:slug would re-trigger this same rewrite and loop forever)
+    try {
+      const indexPath = join(process.cwd(), "dist", "index.html");
+      const html = readFileSync(indexPath, "utf-8");
+      res.setHeader("Content-Type", "text/html");
+      res.status(200).send(html);
+    } catch {
+      // Fallback if dist/index.html isn't found in this environment
+      res.setHeader("Content-Type", "text/html");
+      res.status(200).send(`<!doctype html><html><head><meta http-equiv="refresh" content="0;url=https://termii.vercel.app/blog/${slug}"></head><body></body></html>`);
+    }
     return;
   }
 
@@ -16,8 +28,8 @@ export default async function handler(req, res) {
     const response = await fetch(backendUrl);
 
     if (!response.ok) {
-      res.writeHead(302, { Location: `/blog/${slug}` });
-      res.end();
+      res.setHeader("Content-Type", "text/html");
+      res.status(200).send(`<!doctype html><html><head><title>Termii Africa</title></head><body>Post not found.</body></html>`);
       return;
     }
 
@@ -44,18 +56,17 @@ export default async function handler(req, res) {
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:description" content="${description}" />
   <meta name="twitter:image" content="${image}" />
-  <meta http-equiv="refresh" content="0; url=${url}" />
 </head>
 <body>
-  <p>Redirecting to <a href="${url}">${title}</a>...</p>
+  <p><a href="${url}">${title}</a></p>
 </body>
 </html>`;
 
     res.setHeader("Content-Type", "text/html");
     res.status(200).send(html);
   } catch {
-    res.writeHead(302, { Location: `/blog/${slug}` });
-    res.end();
+    res.setHeader("Content-Type", "text/html");
+    res.status(200).send(`<!doctype html><html><head><title>Termii Africa</title></head><body>Error loading post.</body></html>`);
   }
 }
 
