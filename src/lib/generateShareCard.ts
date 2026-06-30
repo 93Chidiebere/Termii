@@ -106,11 +106,11 @@ export const generateShareCard = async (options: ShareCardOptions): Promise<Blob
   const truncatedCaption = caption.length > 70 ? caption.slice(0, 70) + "..." : caption;
   wrapText(ctx, truncatedCaption, padding, captionY, CARD_WIDTH - padding * 2, 36);
 
-  // Termii Africa logo/wordmark, bottom right
+  // Rapunzale logo/wordmark, bottom right
   ctx.fillStyle = "#D4A24C";
   ctx.font = "bold 32px Georgia, serif";
   ctx.textAlign = "right";
-  ctx.fillText("Termii Africa", CARD_WIDTH - padding, CARD_HEIGHT - padding);
+  ctx.fillText("Rapunzale", CARD_WIDTH - padding, CARD_HEIGHT - padding);
   ctx.textAlign = "left";
 
   ctx.fillStyle = "#A89381";

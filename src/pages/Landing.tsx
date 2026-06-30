@@ -22,7 +22,7 @@ const Landing = () => {
       <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
         <div className="max-w-6xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <div>
-            <span className="font-display text-xl font-bold text-foreground">Termii Africa</span>
+            <span className="font-display text-xl font-bold text-foreground">Rapunzale</span>
           </div>
           <div className="flex items-center gap-3">
             <Link to="/login" className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
@@ -147,14 +147,14 @@ const Landing = () => {
       <footer className="border-t border-border py-8 px-4 sm:px-6">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
-            <span className="font-display text-lg font-bold text-foreground">Termii Africa</span>
+            <span className="font-display text-lg font-bold text-foreground">Rapunzale</span>
             <span className="text-xs text-muted-foreground ml-2">Your Hair is Your Pride</span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
-            <p className="text-xs text-muted-foreground">© 2026 Termii Africa . All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 Rapunzale . All rights reserved.</p>
           </div>
         </div>
       </footer>
