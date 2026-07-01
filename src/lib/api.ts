@@ -516,3 +516,8 @@ export const getBlogPostBySlug = async (slug: string): Promise<BlogPost> => {
   const response = await apiClient.get(`/blog/${slug}`);
   return response.data;
 };
+
+export const markMessagesRead = async (partnerId: string) => {
+  const response = await apiClient.post(`/chat/read/${partnerId}`);
+  return response.data;
+};

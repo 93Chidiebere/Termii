@@ -114,6 +114,28 @@ async def get_history(
         ))
     return result
 
+# ── POST /chat/read/{partner_id} — mark all messages from partner as read ─────
+@router.post("/read/{partner_id}")
+async def mark_messages_read(
+    partner_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    partner = await User.get(partner_id)
+    if not partner:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    messages = await Message.find(
+        Message.sender.id == partner.id,  # type: ignore
+        Message.receiver.id == current_user.id,  # type: ignore
+        Message.is_read == False,
+    ).to_list()
+
+    for msg in messages:
+        msg.is_read = True
+        await msg.save()
+
+    return {"marked_read": len(messages)}
+
 
 # ── WebSocket /chat/ws — real-time messaging ──────────────────────────────────
 @router.websocket("/ws")
@@ -173,6 +195,8 @@ async def websocket_endpoint(
                 "id": str(msg.id),
                 "sender_id": user_id,
                 "sender_name": current_user.full_name,
+                "receiver_id": receiver_id,
+                "receiver_name": receiver.full_name,
                 "text": text,
                 "timestamp": msg.created_at.isoformat(),
             })

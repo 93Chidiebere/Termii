@@ -10,6 +10,7 @@ import { useMessageStore } from "@/stores/messageStore";
 import {
   getConversations,
   getMessageHistory,
+  markMessagesRead,
   createChatSocket,
   searchUsers,
   type ApiConversation,
@@ -106,23 +107,35 @@ const Messages = () => {
           });
 
           setConversations((prev) => {
-            const exists = prev.some(
-              (c) => c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
-            );
+            // Determine who the "other person" is from the current user's perspective
+            const isSentByMe = msg.sender_id === currentUserId;
+            const partnerId = isSentByMe
+              ? (msg as any).receiver_id || msg.sender_id
+              : msg.sender_id;
+            const partnerName = isSentByMe
+              ? (msg as any).receiver_name || msg.sender_name
+              : msg.sender_name;
+
+            const exists = prev.some((c) => c.participant_id === partnerId);
             if (exists) {
               return prev.map((c) =>
-                c.participant_id === msg.sender_id || c.participant_id === msg.receiver_id
-                  ? { ...c, last_message: msg.text, last_timestamp: msg.timestamp }
+                c.participant_id === partnerId
+                  ? {
+                      ...c,
+                      last_message: msg.text,
+                      last_timestamp: msg.timestamp,
+                      unread_count: isSentByMe ? c.unread_count : c.unread_count + 1,
+                    }
                   : c
               );
             }
             return [{
-              participant_id: msg.sender_id,
-              participant_name: msg.sender_name,
+              participant_id: partnerId,
+              participant_name: partnerName,
               participant_email: "",
               last_message: msg.text,
               last_timestamp: msg.timestamp,
-              unread_count: 1,
+              unread_count: isSentByMe ? 0 : 1,
             }, ...prev];
           });
 
@@ -153,9 +166,6 @@ const Messages = () => {
     };
   }, [token]);
 
-
-
-
   // Search users with debounce
   useEffect(() => {
     if (!searchQuery.trim()) {
@@ -178,10 +188,19 @@ const Messages = () => {
 
   // Auto-open conversation if navigated from a notification
   const handleOpenConv = async (conv: ApiConversation) => {
+    // Optimistically clear the unread badge immediately
+    setConversations((prev) =>
+      prev.map((c) =>
+        c.participant_id === conv.participant_id ? { ...c, unread_count: 0 } : c
+      )
+    );
     setActiveConv(conv);
     setIsLoadingMsgs(true);
     try {
-      const history = await getMessageHistory(conv.participant_id);
+      const [history] = await Promise.all([
+        getMessageHistory(conv.participant_id),
+        markMessagesRead(conv.participant_id).catch(() => {}), // mark read, silently ignore errors
+      ]);
       setMessages(history);
     } catch {
       setMessages([]);
