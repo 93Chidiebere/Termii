@@ -27,7 +27,7 @@ export const SplashScreen = () => {
           >
             <div className="text-right">
               <h1 className="font-display text-2xl sm:text-4xl lg:text-5xl font-bold text-primary-foreground leading-tight">
-                Termii Africa
+                Ngala Africa
               </h1>
               <p className="font-display text-sm sm:text-lg lg:text-xl text-primary-foreground/90 mt-1 sm:mt-2">
                 Your Hair, Your Pride
