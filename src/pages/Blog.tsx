@@ -35,9 +35,9 @@ const Blog = () => {
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto flex items-center justify-between px-4 sm:px-6 h-16">
           <Link to="/" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft size={16} /> Back to Rapunzale
+            <ArrowLeft size={16} /> Back to Ngala Africa
           </Link>
-          <span className="font-display text-lg font-bold text-foreground">Rapunzale Blog</span>
+          <span className="font-display text-lg font-bold text-foreground">Ngala Africa Blog</span>
         </div>
       </header>
 
@@ -66,7 +66,7 @@ const Blog = () => {
               to="/login?signup=true"
               className="inline-block mt-6 px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
             >
-              Join Rapunzale in the Meantime
+              Join Ngala Africa in the Meantime
             </Link>
           </motion.div>
         ) : (
@@ -119,7 +119,7 @@ const Blog = () => {
       </main>
 
       <footer className="border-t border-border py-6 px-4 sm:px-6 text-center">
-        <p className="text-xs text-muted-foreground">© 2026 Rapunzale. All rights reserved.</p>
+        <p className="text-xs text-muted-foreground">© 2026 Ngala Africa. All rights reserved.</p>
       </footer>
     </div>
   );

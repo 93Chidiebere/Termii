@@ -14,12 +14,12 @@ router = APIRouter()
 def add_watermark(image_url: str) -> str:
     """
     Inserts a Cloudinary overlay transformation into an existing Cloudinary URL
-    to add the Termii Africa logo watermark, bottom-right, semi-transparent.
+    to add the Ngala Africa logo watermark, bottom-right, semi-transparent.
     """
     if "res.cloudinary.com" not in image_url:
         return image_url  # not a Cloudinary URL, can't transform it
 
-    watermark_public_id = "Termii_Africa_logo_evpfzt"
+    watermark_public_id = "NgalaAfrica_k3yvqo"
     transformation = f"l_{watermark_public_id},w_200,o_70,g_south_east,x_20,y_20/fl_layer_apply"
 
     # Insert the transformation right after "/upload/" in the URL

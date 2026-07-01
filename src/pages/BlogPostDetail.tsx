@@ -57,7 +57,7 @@ const BlogPostDetail = () => {
           >
             <ArrowLeft size={16} /> Back to Blog
           </button>
-          <span className="font-display text-base font-bold text-foreground">Rapunzale</span>
+          <span className="font-display text-base font-bold text-foreground">Ngala Africa</span>
         </div>
       </header>
 
@@ -105,7 +105,7 @@ const BlogPostDetail = () => {
             to="/login?signup=true"
             className="inline-block px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Join Rapunzale
+            Join Ngala Africa
           </Link>
         </div>
       </motion.article>
