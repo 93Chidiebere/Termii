@@ -194,7 +194,7 @@ async def confirm_delivery(
             raise HTTPException(status_code=502, detail="Could not set up payout recipient")
         order.transfer_recipient_code = recipient.get("recipient_code")
 
-    # Release escrowed funds — commission stays with Ngala Africa by sending only 90%
+    # Release escrowed funds — commission stays with Isi Ngala by sending only 90%
     commission_rate = 0.10
     payout_amount = order.amount * (1 - commission_rate)
     amount_kobo = int(payout_amount * 100)
@@ -202,7 +202,7 @@ async def confirm_delivery(
     transfer = await paystack.initiate_transfer(
         recipient_code=order.transfer_recipient_code,
         amount_kobo=amount_kobo,
-        reason=f"Ngala Africa order payout: {order.product_title}",
+        reason=f"Isi Ngala order payout: {order.product_title}",
     )
 
     if not transfer:

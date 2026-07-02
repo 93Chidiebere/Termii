@@ -106,11 +106,11 @@ export const generateShareCard = async (options: ShareCardOptions): Promise<Blob
   const truncatedCaption = caption.length > 70 ? caption.slice(0, 70) + "..." : caption;
   wrapText(ctx, truncatedCaption, padding, captionY, CARD_WIDTH - padding * 2, 36);
 
-  // Ngala Africa logo/wordmark, bottom right
+  // Isi Ngala logo/wordmark, bottom right
   ctx.fillStyle = "#D4A24C";
   ctx.font = "bold 32px Georgia, serif";
   ctx.textAlign = "right";
-  ctx.fillText("Ngala Africa", CARD_WIDTH - padding, CARD_HEIGHT - padding);
+  ctx.fillText("Isi Ngala", CARD_WIDTH - padding, CARD_HEIGHT - padding);
   ctx.textAlign = "left";
 
   ctx.fillStyle = "#A89381";

@@ -29,7 +29,7 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       res.setHeader("Content-Type", "text/html");
-      res.status(200).send(`<!doctype html><html><head><title>Ngala Africa</title></head><body>Post not found.</body></html>`);
+      res.status(200).send(`<!doctype html><html><head><title>Isi Ngala</title></head><body>Post not found.</body></html>`);
       return;
     }
 
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
 
     const title = escapeHtml(post.title);
     const description = escapeHtml(post.summary);
-    const image = post.og_image || "https://res.cloudinary.com/dwfojbv0m/image/upload/w_1200,h_630,c_fill/v1782903419/NgalaAfrica_k3yvqo.png";
+    const image = post.og_image || "https://res.cloudinary.com/dwfojbv0m/image/upload/v1783019292/isingala_h2455j.png";
     const url = `https://termii.vercel.app/blog/${slug}`;
 
     const html = `<!doctype html>
@@ -66,7 +66,7 @@ export default async function handler(req, res) {
     res.status(200).send(html);
   } catch {
     res.setHeader("Content-Type", "text/html");
-    res.status(200).send(`<!doctype html><html><head><title>Ngala Africa</title></head><body>Error loading post.</body></html>`);
+    res.status(200).send(`<!doctype html><html><head><title>Isi Ngala</title></head><body>Error loading post.</body></html>`);
   }
 }
 
