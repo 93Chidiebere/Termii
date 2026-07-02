@@ -88,7 +88,7 @@ async def create_order(
     await order.insert()
 
     amount_kobo = int(product.price * 100)
-    callback_url = "https://termii.vercel.app/orders/callback"
+    callback_url = "https://isingala.com/orders/callback"
 
     payment = await paystack.initialize_transaction(
         email=current_user.email,

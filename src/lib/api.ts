@@ -1,7 +1,7 @@
 import axios from "axios";
 import type { Post, User } from "@/types";
 
-const BASE_URL = "https://termii-production.up.railway.app";
+const BASE_URL = "https://api.isingala.com";
 
 export const apiClient = axios.create({
   baseURL: BASE_URL,

@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const backendUrl = `https://termii-production.up.railway.app/blog/${slug}`;
+    const backendUrl = `https://api.isingala.com/blog/${slug}`;
     const response = await fetch(backendUrl);
 
     if (!response.ok) {
