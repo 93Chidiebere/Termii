@@ -540,9 +540,7 @@ const Marketplace = () => {
     load();
   }, []);
 
-  const allProducts = realProducts;
-
-  const filtered = allProducts.filter((p) => {
+  const filtered = realProducts.filter((p) => {
     const matchSearch =
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
