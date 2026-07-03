@@ -5,7 +5,7 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { products as mockProducts, categories } from "@/data/mockMarketplace";
+import { categories } from "@/data/mockMarketplace";
 import { useAuthStore } from "@/stores/authStore";
 import {
   getProducts, createProduct, type ApiProduct,
@@ -540,11 +540,7 @@ const Marketplace = () => {
     load();
   }, []);
 
-  const realIds = new Set(realProducts.map((p) => p.id));
-  const allProducts = [
-    ...realProducts,
-    ...mockProducts.filter((p) => !realIds.has(p.id)),
-  ];
+  const allProducts = realProducts;
 
   const filtered = allProducts.filter((p) => {
     const matchSearch =

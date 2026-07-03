@@ -12,6 +12,7 @@ import { useAuthStore } from "@/stores/authStore";
 import { useGlobalSocket } from "@/hooks/useGlobalSocket";
 import { getMe } from "@/lib/api";
 import { useRoleStore } from "@/stores/roleStore";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
@@ -41,6 +42,7 @@ const App = () => {
   const { isAuthenticated } = useAuthStore();
   const { loadMyFollowing } = useFollowStore();
   useGlobalSocket();
+  usePushNotifications();
 
   useEffect(() => {
     if (isAuthenticated) {
