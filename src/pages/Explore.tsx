@@ -137,9 +137,7 @@ const Explore = () => {
                     onClick={() => handleCategoryClick(cat.name)}
                     className="bg-card border border-border rounded-xl p-4 cursor-pointer hover:border-primary/40 transition-colors">
                     <p className="font-semibold text-sm text-foreground">{cat.name}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {cat.count.toLocaleString()} posts
-                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Browse posts</p>
                   </motion.div>
                 ))}
               </div>
