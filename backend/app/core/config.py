@@ -16,6 +16,10 @@ class Settings(BaseSettings):
 
     PAYSTACK_SECRET_KEY: str = ""
 
+    VAPID_PUBLIC_KEY: str = "BHXYuSinot1EEdIHbO-SrbALB4e8iN9OEp5HHfm34xHulxcvcjhQMRO7bRGMBpX5O2uWkAH6vhPYSNDSJSwPAeQ"
+    VAPID_PRIVATE_KEY: str = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgepKce7Aqk-TjbsQJ6EGprdn7NmCU2c2g3OmLtzI5fu6hRANCAAR12Lkop6LdRBHSB2zvkq2wCweHvIjfThKeRx35t-MR7pcXL3I4UDETu20RjAaV-TtrlpAB-r4T2EjQ0iUsDwHk"
+    VAPID_EMAIL: str = "mailto:vchidiebere.vc@gmail.com"
+
     class Config:
         env_file = ".env"
 

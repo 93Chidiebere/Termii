@@ -150,6 +150,45 @@ async def create_post(
         hair_type=post_in.hair_type,
     )
     await post.insert()
+
+    # Send push notifications to followers
+    try:
+        from app.models.push_subscription import PushSubscription
+        from app.services.push_notifications import send_push_notification
+        from app.api.routes.follows import Follow
+        import asyncio
+
+        # Get all followers of the poster
+        followers = await Follow.find(
+            Follow.following_id == str(current_user.id)
+        ).to_list()
+
+        follower_ids = [f.follower_id for f in followers]
+
+        if follower_ids:
+            # Get their push subscriptions
+            subscriptions = await PushSubscription.find(
+                {"user_id": {"$in": follower_ids}}
+            ).to_list()
+
+            # Send to all concurrently
+            if subscriptions:
+                await asyncio.gather(*[
+                    send_push_notification(
+                        subscription={
+                            "endpoint": s.endpoint,
+                            "p256dh": s.p256dh,
+                            "auth": s.auth,
+                        },
+                        title=f"{current_user.full_name} just posted",
+                        body=post.caption[:80] + ("..." if len(post.caption) > 80 else ""),
+                        url=f"/post/{str(post.id)}",
+                    )
+                    for s in subscriptions
+                ])
+    except Exception:
+        pass  # Never let push notification failure break post creation
+    
     return await build_post_response(post, current_user, str(current_user.id))
 
 
