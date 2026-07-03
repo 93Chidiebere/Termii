@@ -1,19 +1,18 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { ArrowLeft, Star, Heart, MessageCircle, ShoppingBag, Truck, ChevronLeft, ChevronRight, Loader2 } from "lucide-react";
+import {
+  ArrowLeft, Star, Heart, MessageCircle, ShoppingBag,
+  Truck, ChevronLeft, ChevronRight, Loader2, BadgeCheck,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { products as mockProducts, type Product } from "@/data/mockMarketplace";
+import type { Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { getProductById, createOrder, type ApiProduct } from "@/lib/api";
-import {
-  Search, TrendingUp, Sparkles, MapPin, Users,
- ShieldAlert, Plus, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
-} from "lucide-react";
 
 const transformApiProduct = (p: ApiProduct): Product => ({
   id: p.id,
@@ -30,6 +29,7 @@ const transformApiProduct = (p: ApiProduct): Product => ({
     rating: p.seller.rating,
     completedOrders: p.seller.completed_orders,
     location: p.seller.location || "",
+    verificationStatus: p.seller.verification_status,
   },
   deliveryOptions: p.delivery_location ? [p.delivery_location] : ["Standard (3-5 days)"],
   tags: p.tags,
@@ -57,12 +57,7 @@ const ProductDetail = () => {
         const realProduct = await getProductById(id);
         setProduct(transformApiProduct(realProduct));
       } catch {
-        const mockProduct = mockProducts.find((p) => p.id === id);
-        if (mockProduct) {
-          setProduct(mockProduct);
-        } else {
-          setNotFound(true);
-        }
+        setNotFound(true);
       } finally {
         setIsLoading(false);
       }
@@ -97,12 +92,11 @@ const ProductDetail = () => {
   const nextImage = () => setCurrentImage((i) => (i + 1) % product.images.length);
   const prevImage = () => setCurrentImage((i) => (i - 1 + product.images.length) % product.images.length);
 
-    const handleBuyNow = async () => {
+  const handleBuyNow = async () => {
     if (!product) return;
     setIsBuying(true);
     try {
       const result = await createOrder(product.id);
-      // Redirect to Paystack's hosted checkout page
       window.location.href = result.authorization_url;
     } catch (err: any) {
       const message = err?.response?.data?.detail || "Could not start checkout. Please try again.";
@@ -111,14 +105,21 @@ const ProductDetail = () => {
     }
   };
 
-
   return (
     <AppLayout>
       <div className="max-w-2xl mx-auto pb-24 md:pb-8">
         <div className="px-4 py-3">
-          <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm">
-            <ArrowLeft size={18} />
-            Back
+          <button
+            onClick={() => {
+              if (window.history.state && window.history.state.idx > 0) {
+                navigate(-1);
+              } else {
+                navigate("/marketplace");
+              }
+            }}
+            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm"
+          >
+            <ArrowLeft size={18} /> Back
           </button>
         </div>
 
@@ -218,7 +219,9 @@ const ProductDetail = () => {
                 </span>
                 <span>·</span>
                 <span>{product.seller.completedOrders} orders</span>
-                {product.seller.location && <><span>·</span><span>{product.seller.location}</span></>}
+                {product.seller.location && (
+                  <><span>·</span><span>{product.seller.location}</span></>
+                )}
               </div>
             </div>
           </button>

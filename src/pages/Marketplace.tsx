@@ -5,13 +5,13 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
-import { categories } from "@/data/mockMarketplace";
+import { marketplaceCategories as categories } from "@/types";
+import type { Product } from "@/types";
 import { useAuthStore } from "@/stores/authStore";
 import {
   getProducts, createProduct, type ApiProduct,
   getBankList, verifyBankAccount, onboardSeller, getMe, type Bank,
 } from "@/lib/api";
-import type { Product } from "@/data/mockMarketplace";
 import { toast } from "sonner";
 import {
   Search, Star, TrendingUp, Sparkles, MapPin, Users,

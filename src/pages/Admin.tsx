@@ -12,10 +12,13 @@ import {
 import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { useRoleStore } from "@/stores/roleStore";
-import {
-  mockAdminUsers, mockCreatorRequests, mockFlaggedPosts,
-  type AdminUser, type CreatorRequest, type FlaggedPost, type UserStatus,
-} from "@/data/mockAdminData";
+
+import type { AdminUser, CreatorRequest, FlaggedPost, UserStatus } from "@/types";
+
+const mockAdminUsers: AdminUser[] = [];
+const mockCreatorRequests: CreatorRequest[] = [];
+const mockFlaggedPosts: FlaggedPost[] = [];
+
 import {
   getPendingSellers, verifySeller, type PendingSeller,
   getAllUsers, updateUserStatus, type AdminUserData,

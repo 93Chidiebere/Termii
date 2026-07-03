@@ -3,7 +3,22 @@ import { motion } from "framer-motion";
 import { Search, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
-import { trendingTags, hairCategories } from "@/data/mockData";
+const trendingTags = [
+  "wash-day", "4C-curls", "protective-style", "twist-out",
+  "cornrows", "afro", "natural-hair", "hair-growth",
+  "shea-butter", "loc-journey", "braids", "silk-press",
+];
+
+const hairCategories = [
+  { name: "Twist Outs" },
+  { name: "Protective Styles" },
+  { name: "Wash Day" },
+  { name: "Cornrows & Braids" },
+  { name: "Afros" },
+  { name: "Locs" },
+  { name: "Silk Press" },
+  { name: "Bantu Knots" },
+];
 import { getPosts } from "@/lib/api";
 import type { Post } from "@/types";
 import { FloatingCreateButton } from "@/components/feed/FloatingCreateButton";
