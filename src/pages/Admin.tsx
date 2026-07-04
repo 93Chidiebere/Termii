@@ -81,7 +81,7 @@ const AdminPanel = () => {
           </Link>
           <div>
             <h1 className="font-display text-lg font-bold text-foreground">Admin Panel</h1>
-            <p className="text-xs text-muted-foreground">Termii Management</p>
+            <p className="text-xs text-muted-foreground">Isi Ngala Management</p>
           </div>
         </div>
       </header>
