@@ -75,8 +75,8 @@ const HairTwinDetail = () => {
   const handleShare = useCallback(async () => {
     if (!twin) return;
     const shareData = {
-      title: `My Hair Twin on Termii Africa!`,
-      text: `I'm a ${percentage}% match with ${twin.full_name} on Termii Africa! Find your Hair Twin too 🌿`,
+      title: `My Hair Twin on Isi Ngala!`,
+      text: `I'm a ${percentage}% match with ${twin.full_name} on Isi Ngala! Find your Hair Twin too 🌿`,
       url: window.location.href,
     };
     try {
@@ -211,7 +211,7 @@ const HairTwinDetail = () => {
             <CardContent>
               <div ref={shareCardRef} className="bg-warm-brown rounded-xl p-5 text-warm-brown-foreground mb-4">
                 <div className="flex items-center gap-2 mb-3">
-                  <span className="font-display text-lg font-bold">Termii Africa</span>
+                  <span className="font-display text-lg font-bold">Isi Ngala</span>
                   <span className="text-xs opacity-60">Hair Twin Match</span>
                 </div>
                 <Separator className="bg-warm-brown-foreground/20 mb-3" />

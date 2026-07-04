@@ -35,7 +35,7 @@ const ResetPassword = () => {
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="font-display text-4xl font-bold text-foreground mb-2">Termii Africa</h1>
+            <h1 className="font-display text-4xl font-bold text-foreground mb-2">Isi Ngala</h1>
           </div>
           <div className="bg-card border border-border rounded-2xl p-8 text-center">
             <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
@@ -61,7 +61,7 @@ const ResetPassword = () => {
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-display text-4xl font-bold text-foreground mb-2">Termii Africa</h1>
+          <h1 className="font-display text-4xl font-bold text-foreground mb-2">Isi Ngala</h1>
           <p className="text-sm text-muted-foreground tracking-wider uppercase">Your Hair is Your Pride</p>
         </div>
 
