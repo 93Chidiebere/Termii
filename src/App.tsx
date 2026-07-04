@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { SplashScreen } from "./components/SplashScreen";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -38,6 +38,13 @@ const BlogPostDetail = lazy(() => import("./pages/BlogPostDetail"));
 
 const queryClient = new QueryClient();
 
+// Smart home route — authenticated users go straight to feed,
+// new/unauthenticated users see the landing page
+const SmartHomeRoute = () => {
+  const { isAuthenticated } = useAuthStore();
+  return isAuthenticated ? <Navigate to="/feed" replace /> : <Landing />;
+};
+
 const App = () => {
   const { isAuthenticated } = useAuthStore();
   const { loadMyFollowing } = useFollowStore();
@@ -47,12 +54,9 @@ const App = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadMyFollowing();
-      // Re-sync admin status on page load/refresh since roleStore doesn't persist
       getMe().then((profile) => {
         useRoleStore.getState().setIsAdmin(profile.is_admin ?? false);
-      }).catch(() => {
-        // Token may be expired — ProtectedRoute will handle redirect
-      });
+      }).catch(() => {});
     }
   }, [isAuthenticated]);
 
@@ -63,37 +67,35 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-
-        <Suspense fallback={
-          <div className="min-h-screen flex items-center justify-center bg-background">
-            <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          </div>
-        }>
-          <Routes>
-            <Route path="/" element={<Landing />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/forgot-password" element={<ForgotPassword />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-            <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-            <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
-            <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
-            <Route path="/create" element={<ProtectedRoute><Create /></ProtectedRoute>} />
-            <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="/hair-twins" element={<ProtectedRoute><HairTwins /></ProtectedRoute>} />
-            <Route path="/hair-twins/:id" element={<ProtectedRoute><HairTwinDetail /></ProtectedRoute>} />
-            <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
-            <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
-            <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
-            <Route path="/blog" element={<Blog />} />
-            <Route path="/blog/:slug" element={<BlogPostDetail />} />
-            <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </Suspense>
-
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center bg-background">
+              <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+          }>
+            <Routes>
+              <Route path="/" element={<SmartHomeRoute />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+              <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
+              <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
+              <Route path="/create" element={<ProtectedRoute><Create /></ProtectedRoute>} />
+              <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/hair-twins" element={<ProtectedRoute><HairTwins /></ProtectedRoute>} />
+              <Route path="/hair-twins/:id" element={<ProtectedRoute><HairTwinDetail /></ProtectedRoute>} />
+              <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
+              <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+              <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
+              <Route path="/blog" element={<Blog />} />
+              <Route path="/blog/:slug" element={<BlogPostDetail />} />
+              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

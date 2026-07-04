@@ -44,7 +44,7 @@ export const SplashScreen = () => {
             style={{ backgroundColor: "hsl(var(--warm-brown))" }}
           >
             <p className="font-display italic text-sm sm:text-lg lg:text-xl text-cream" style={{ color: "hsl(var(--cream))" }}>
-              From CICO
+              From UNICCO
             </p>
           </motion.div>
         </motion.div>
