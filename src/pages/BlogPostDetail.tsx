@@ -57,7 +57,7 @@ const BlogPostDetail = () => {
           >
             <ArrowLeft size={16} /> Back to Blog
           </button>
-          <span className="font-display text-base font-bold text-foreground">Ngala Africa</span>
+          <span className="font-display text-base font-bold text-foreground">Isi Ngala</span>
         </div>
       </header>
 
