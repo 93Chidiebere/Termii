@@ -105,7 +105,7 @@ const BlogPostDetail = () => {
             to="/login?signup=true"
             className="inline-block px-6 py-3 rounded-full bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            Join Ngala Africa
+            Join Isi Ngala
           </Link>
         </div>
       </motion.article>
