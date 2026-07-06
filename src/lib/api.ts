@@ -57,12 +57,34 @@ export const registerUser = async (data: {
   password: string;
   username?: string;
   hair_type?: string;
+  date_of_birth: string;
 }) => {
   const response = await apiClient.post("/auth/register", data);
   return response.data;
 };
 
-export const getMe = async () => {
+export interface MeResponse {
+  id: string;
+  email: string;
+  full_name: string;
+  username?: string;
+  avatar_url?: string;
+  hair_type?: string;
+  is_admin: boolean;
+  date_of_birth?: string;
+  age_verified: boolean;
+  seller_type?: string;
+  business_name?: string;
+  verification_status: string;
+  paystack_subaccount_code?: string;
+  is_seller: boolean;
+  badge_issued_at?: string;
+  badge_expires_at?: string;
+  listing_cap: number;
+  active_listing_count: number;
+}
+
+export const getMe = async (): Promise<MeResponse> => {
   const response = await apiClient.get("/auth/me");
   return response.data;
 };
@@ -320,6 +342,7 @@ export interface HairProfileData {
   hair_goals?: string[];
   hair_treatments?: string[];
   avatar_url?: string;
+  date_of_birth?: string;
 }
 
 export const updateMyProfile = async (data: HairProfileData) => {

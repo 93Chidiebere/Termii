@@ -13,13 +13,14 @@ interface SignupData {
   interests: string[];
   country: string;
   province: string;
-  isMinor: boolean;
+  dateOfBirth: string;
 }
 
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
-  isMinor: boolean;
+  ageVerified: boolean;
+  hasDateOfBirth: boolean;
   token: string | null;
   signupStep: number;
   signupData: Partial<SignupData>;
@@ -28,6 +29,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<void>;
   signup: () => Promise<void>;
   logout: () => void;
+  syncProfile: () => Promise<void>;
   setSignupStep: (step: number) => void;
   updateSignupData: (data: Partial<SignupData>) => void;
   resetSignup: () => void;
@@ -39,7 +41,8 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       isAuthenticated: false,
-      isMinor: false,
+      ageVerified: false,
+      hasDateOfBirth: false,
       token: null,
       signupStep: 0,
       signupData: {},
@@ -75,6 +78,8 @@ export const useAuthStore = create<AuthState>()(
             user: userObj,
             isAuthenticated: true,
             token: data.access_token,
+            ageVerified: profile.age_verified ?? false,
+            hasDateOfBirth: !!profile.date_of_birth,
             isLoading: false,
             error: null,
           });
@@ -109,11 +114,11 @@ export const useAuthStore = create<AuthState>()(
             password: signupData.password || "",
             username: signupData.username || undefined,
             hair_type: signupData.hairType,
+            date_of_birth: signupData.dateOfBirth || "",
           });
           // After registering, log in automatically — this also calls getMe()
           await get().login(signupData.email || "", signupData.password || "");
           set({
-            isMinor: signupData.isMinor ?? false,
             signupStep: 0,
             signupData: {},
             isLoading: false,
@@ -140,11 +145,26 @@ export const useAuthStore = create<AuthState>()(
         set({
           user: null,
           isAuthenticated: false,
-          isMinor: false,
+          ageVerified: false,
+          hasDateOfBirth: false,
           token: null,
           error: null,
           isLoading: false,
         });
+      },
+
+      // Re-fetch /auth/me and refresh age/DOB state — used after the
+      // one-time date-of-birth backfill prompt for pre-existing accounts.
+      syncProfile: async () => {
+        try {
+          const profile = await getMe();
+          set({
+            ageVerified: profile.age_verified ?? false,
+            hasDateOfBirth: !!profile.date_of_birth,
+          });
+        } catch {
+          // Silently ignore — worst case the gate re-prompts next time
+        }
       },
 
       setSignupStep: (step) => set({ signupStep: step }),
@@ -161,7 +181,8 @@ export const useAuthStore = create<AuthState>()(
       partialize: (state) => ({
         user: state.user,
         isAuthenticated: state.isAuthenticated,
-        isMinor: state.isMinor,
+        ageVerified: state.ageVerified,
+        hasDateOfBirth: state.hasDateOfBirth,
         token: state.token,
       }),
     }

@@ -1,16 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
-from typing import List
+from typing import List, Optional as Opt
+from datetime import date
+from pydantic import BaseModel as BM
 from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
 from app.services.auth import get_password_hash, verify_password, create_access_token
 from app.core.config import settings
-from typing import List, Optional as Opt
-from pydantic import BaseModel as BM
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+MINIMUM_AGE = 16
+
+
+# ── Helper: compute age from date of birth ─────────────────────────────────────
+def calculate_age(dob: date) -> int:
+    today = date.today()
+    age = today.year - dob.year
+    if (today.month, today.day) < (dob.month, dob.day):
+        age -= 1
+    return age
 
 
 # ── Helper: decode JWT and return the current user ────────────────────────────
@@ -35,7 +46,7 @@ async def register(user_in: UserCreate):
     existing_user = await User.find_one(User.email == user_in.email)
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
-    
+
     # Check username uniqueness if provided
     if user_in.username:
         existing_username = await User.find_one(User.username == user_in.username)
@@ -43,12 +54,16 @@ async def register(user_in: UserCreate):
             raise HTTPException(status_code=400, detail="Username already taken")
 
     hashed_pwd = get_password_hash(user_in.password)
+    age = calculate_age(user_in.date_of_birth)
+
     user = User(
         email=user_in.email,
         hashed_password=hashed_pwd,
         full_name=user_in.full_name,
         username=user_in.username,
         hair_type=user_in.hair_type,
+        date_of_birth=user_in.date_of_birth,
+        age_verified=age >= MINIMUM_AGE,
     )
     await user.insert()
     return UserResponse.from_mongo(user)
@@ -96,6 +111,7 @@ async def search_users(
     ]
     return [UserResponse.from_mongo(u) for u in results[:10]]  # max 10 results
 
+
 class HairProfileUpdate(BM):
     full_name: Opt[str] = None
     hair_type: Opt[str] = None
@@ -106,6 +122,8 @@ class HairProfileUpdate(BM):
     hair_goals: Opt[List[str]] = None
     hair_treatments: Opt[List[str]] = None
     avatar_url: Opt[str] = None
+    date_of_birth: Opt[date] = None  # one-time backfill for pre-existing accounts
+
 
 @router.patch("/me")
 async def update_me(
@@ -115,5 +133,11 @@ async def update_me(
     data = updates.model_dump(exclude_none=True)
     for key, value in data.items():
         setattr(current_user, key, value)
+
+    # Recompute age_verified whenever date_of_birth is set or changed
+    if "date_of_birth" in data:
+        age = calculate_age(current_user.date_of_birth)
+        current_user.age_verified = age >= MINIMUM_AGE
+
     await current_user.save()
     return UserResponse.from_mongo(current_user)

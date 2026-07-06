@@ -3,7 +3,7 @@ from typing import List
 from app.api.routes.shop.schemas import ProductCreate, ProductResponse, SellerInfo
 from app.api.routes.shop.models import Product
 from app.models.user import User
-from app.api.dependencies import get_current_user, get_current_admin
+from app.api.dependencies import get_current_user, get_current_admin, require_age_verified
 
 router = APIRouter()
 
@@ -42,6 +42,7 @@ def build_product_response(product: Product, seller: User) -> ProductResponse:
 async def create_product(
     product_in: ProductCreate,
     current_user: User = Depends(get_current_user),
+    _age_check: User = Depends(require_age_verified),
 ):
     product = Product(
         seller=current_user,
@@ -63,7 +64,9 @@ async def create_product(
 
 # ── GET /shop/ — fetch all approved products ──────────────────────────────────
 @router.get("/", response_model=List[ProductResponse])
-async def get_approved_products():
+async def get_approved_products(
+    _age_check: User = Depends(require_age_verified),
+):
     products = await Product.find(Product.status == "APPROVED").to_list()
     result = []
     for product in products:
@@ -76,7 +79,10 @@ async def get_approved_products():
 
 # ── GET /shop/{product_id} — fetch a single product ──────────────────────────
 @router.get("/{product_id}", response_model=ProductResponse)
-async def get_product(product_id: str):
+async def get_product(
+    product_id: str,
+    _age_check: User = Depends(require_age_verified),
+):
     product = await Product.get(product_id)
     if not product:
         raise HTTPException(status_code=404, detail="Product not found")

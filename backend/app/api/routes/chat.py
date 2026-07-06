@@ -3,6 +3,7 @@ from app.services.chat_manager import chat_manager
 from app.models.message import Message
 from app.models.user import User
 from app.api.routes.auth import get_current_user
+from app.api.dependencies import require_age_verified
 from pydantic import BaseModel
 from typing import List, Optional
 import json
@@ -32,7 +33,10 @@ class ConversationSummary(BaseModel):
 
 # ── GET /chat/conversations — list all conversations for current user ──────────
 @router.get("/conversations", response_model=List[ConversationSummary])
-async def get_conversations(current_user: User = Depends(get_current_user)):
+async def get_conversations(
+    current_user: User = Depends(get_current_user),
+    _age_check: User = Depends(require_age_verified),
+):
     from beanie.operators import Or
     messages = await Message.find(
         Or(
@@ -80,6 +84,7 @@ async def get_conversations(current_user: User = Depends(get_current_user)):
 async def get_history(
     partner_id: str,
     current_user: User = Depends(get_current_user),
+    _age_check: User = Depends(require_age_verified),
 ):
     from beanie.operators import Or, And
 
@@ -119,6 +124,7 @@ async def get_history(
 async def mark_messages_read(
     partner_id: str,
     current_user: User = Depends(get_current_user),
+    _age_check: User = Depends(require_age_verified),
 ):
     partner = await User.get(partner_id)
     if not partner:
@@ -155,6 +161,10 @@ async def websocket_endpoint(
             return
         current_user = await User.find_one(User.email == email)
         if not current_user:
+            await websocket.close(code=1008)
+            return
+        # Age gate: block under-16 and users who haven't provided a date_of_birth yet
+        if not getattr(current_user, "date_of_birth", None) or not getattr(current_user, "age_verified", False):
             await websocket.close(code=1008)
             return
     except JWTError:

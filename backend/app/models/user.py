@@ -1,6 +1,6 @@
 from beanie import Document, Indexed
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, date
 from pydantic import Field
 
 class User(Document):
@@ -19,6 +19,10 @@ class User(Document):
     hair_goals: Optional[List[str]] = None
     hair_treatments: Optional[List[str]] = None
 
+    # ── Age verification (marketplace + messaging gate, 16+) ─────────────────
+    date_of_birth: Optional[date] = None
+    age_verified: bool = False
+
     # ── Seller / marketplace fields ───────────────────────────────────────────
     seller_type: Optional[str] = None        # "individual" | "business"
     business_name: Optional[str] = None
@@ -28,6 +32,12 @@ class User(Document):
     bank_account_name: Optional[str] = None
     paystack_subaccount_code: Optional[str] = None
     verification_status: str = "unverified"  # "unverified" | "pending" | "verified"
+    is_seller: bool = False
+    badge_issued_at: Optional[datetime] = None
+    badge_expires_at: Optional[datetime] = None
+    listing_cap: int = 20
+    active_listing_count: int = 0
+    dispute_count: int = 0
 
     is_admin: bool = False
     status: str = "active"  # "active" | "suspended" | "banned"

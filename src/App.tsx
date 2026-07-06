@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { lazy, Suspense } from "react";
 import { SplashScreen } from "./components/SplashScreen";
 import ProtectedRoute from "./components/ProtectedRoute";
+import AgeGate from "./components/AgeGate";
 import { useEffect } from "react";
 import { useFollowStore } from "@/stores/followStore";
 import { useAuthStore } from "@/stores/authStore";
@@ -83,12 +84,12 @@ const App = () => {
               <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
               <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />
               <Route path="/create" element={<ProtectedRoute><Create /></ProtectedRoute>} />
-              <Route path="/messages" element={<ProtectedRoute><Messages /></ProtectedRoute>} />
+              <Route path="/messages" element={<ProtectedRoute><AgeGate featureName="Messages"><Messages /></AgeGate></ProtectedRoute>} />
               <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/hair-twins" element={<ProtectedRoute><HairTwins /></ProtectedRoute>} />
               <Route path="/hair-twins/:id" element={<ProtectedRoute><HairTwinDetail /></ProtectedRoute>} />
-              <Route path="/marketplace" element={<ProtectedRoute><Marketplace /></ProtectedRoute>} />
-              <Route path="/product/:id" element={<ProtectedRoute><ProductDetail /></ProtectedRoute>} />
+              <Route path="/marketplace" element={<ProtectedRoute><AgeGate featureName="Marketplace"><Marketplace /></AgeGate></ProtectedRoute>} />
+              <Route path="/product/:id" element={<ProtectedRoute><AgeGate featureName="Marketplace"><ProductDetail /></AgeGate></ProtectedRoute>} />
               <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPostDetail />} />

@@ -3,6 +3,7 @@ from beanie import init_beanie
 from app.core.config import settings
 from app.models.blog import BlogPost
 from app.models.push_subscription import PushSubscription
+from app.models.seller_application import SellerApplication
 
 async def init_db():
     client = AsyncIOMotorClient(settings.MONGODB_URI)
@@ -17,5 +18,5 @@ async def init_db():
 
     await init_beanie(
         database=client.get_default_database(),
-        document_models=[User, Post, Message, Product, PostLike, PostSave, PostComment, Follow, Order, BlogPost, PushSubscription]
+        document_models=[User, Post, Message, Product, PostLike, PostSave, PostComment, Follow, Order, BlogPost, PushSubscription, SellerApplication]
     )
