@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { Input } from "@/components/ui/input";
@@ -7,15 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { marketplaceCategories as categories } from "@/types";
 import type { Product } from "@/types";
-import { useAuthStore } from "@/stores/authStore";
 import {
-  getProducts, createProduct, type ApiProduct,
-  getBankList, verifyBankAccount, onboardSeller, getMe, type Bank,
+  getProducts, createProduct, type ApiProduct, getMe,
 } from "@/lib/api";
 import { toast } from "sonner";
 import {
   Search, Star, TrendingUp, Sparkles, MapPin, Users,
-  ShoppingBag, Plus, Loader2, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
+  ShoppingBag, Plus, Loader2, X, BadgeCheck,
 } from "lucide-react";
 
 const sectionFilters = [
@@ -106,226 +104,6 @@ const uploadToCloudinary = async (file: File): Promise<string> => {
   if (!response.ok) throw new Error("Image upload failed");
   const data = await response.json();
   return data.secure_url;
-};
-
-// ── Seller Onboarding Modal ───────────────────────────────────────────────────
-const SellerOnboardingModal = ({
-  onClose,
-  onSuccess,
-}: {
-  onClose: () => void;
-  onSuccess: () => void;
-}) => {
-  const [step, setStep] = useState<"type" | "details">("type");
-  const [sellerType, setSellerType] = useState<"individual" | "business" | null>(null);
-  const [businessName, setBusinessName] = useState("");
-  const [cacNumber, setCacNumber] = useState("");
-  const [banks, setBanks] = useState<Bank[]>([]);
-  const [bankCode, setBankCode] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [verifiedName, setVerifiedName] = useState("");
-  const [isLoadingBanks, setIsLoadingBanks] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (step === "details" && banks.length === 0) {
-      const loadBanks = async () => {
-        setIsLoadingBanks(true);
-        try {
-          const data = await getBankList();
-          setBanks(data);
-        } catch {
-          toast.error("Could not load bank list. Please try again.");
-        } finally {
-          setIsLoadingBanks(false);
-        }
-      };
-      loadBanks();
-    }
-  }, [step, banks.length]);
-
-  const handleSelectType = (type: "individual" | "business") => {
-    setSellerType(type);
-    setStep("details");
-  };
-
-  const handleVerifyAccount = async () => {
-    if (!bankCode || accountNumber.length < 10) {
-      toast.error("Please select a bank and enter a valid account number.");
-      return;
-    }
-    setIsVerifying(true);
-    setVerifiedName("");
-    try {
-      const result = await verifyBankAccount(bankCode, accountNumber);
-      setVerifiedName(result.account_name);
-      toast.success(`Account verified: ${result.account_name}`);
-    } catch {
-      toast.error("Could not verify this account. Check the number and bank.");
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!sellerType) return;
-    if (sellerType === "business" && !businessName.trim()) {
-      toast.error("Please enter your business name.");
-      return;
-    }
-    if (!verifiedName) {
-      toast.error("Please verify your bank account first.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onboardSeller({
-        seller_type: sellerType,
-        business_name: sellerType === "business" ? businessName.trim() : undefined,
-        cac_number: sellerType === "business" ? cacNumber.trim() || undefined : undefined,
-        bank_code: bankCode,
-        bank_account_number: accountNumber,
-      });
-      toast.success("Seller account set up! You can now list products. 🎉");
-      onSuccess();
-    } catch {
-      toast.error("Could not complete seller setup. Please try again.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="bg-card border border-border rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
-      >
-        <div className="flex items-center justify-between p-5 border-b border-border">
-          <h2 className="font-display text-lg font-bold text-foreground">
-            {step === "type" ? "Become a Seller" : "Payout Details"}
-          </h2>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
-            <X size={20} />
-          </button>
-        </div>
-
-        {step === "type" && (
-          <div className="p-5 space-y-3">
-            <p className="text-sm text-muted-foreground mb-2">
-              Before you can list products, set up how you'll get paid. This takes about a minute.
-            </p>
-            <button
-              onClick={() => handleSelectType("individual")}
-              className="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary/40 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <UserIcon size={20} className="text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-foreground">Individual Seller</p>
-                <p className="text-xs text-muted-foreground">Selling personal or homemade products</p>
-              </div>
-            </button>
-            <button
-              onClick={() => handleSelectType("business")}
-              className="w-full flex items-center gap-3 p-4 rounded-xl border border-border hover:border-primary/40 transition-colors text-left"
-            >
-              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                <Building2 size={20} className="text-primary" />
-              </div>
-              <div>
-                <p className="font-semibold text-sm text-foreground">Registered Business</p>
-                <p className="text-xs text-muted-foreground">CAC-registered brand or company</p>
-              </div>
-            </button>
-          </div>
-        )}
-
-        {step === "details" && (
-          <div className="p-5 space-y-4">
-            {sellerType === "business" && (
-              <>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">Business Name *</label>
-                  <input value={businessName} onChange={(e) => setBusinessName(e.target.value)}
-                    placeholder="e.g. Ada's Beauty Ltd"
-                    className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-foreground mb-1.5">
-                    CAC Number <span className="text-muted-foreground">(optional)</span>
-                  </label>
-                  <input value={cacNumber} onChange={(e) => setCacNumber(e.target.value)}
-                    placeholder="e.g. RC1234567"
-                    className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30" />
-                </div>
-              </>
-            )}
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Bank *</label>
-              {isLoadingBanks ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground py-2">
-                  <Loader2 size={14} className="animate-spin" /> Loading banks...
-                </div>
-              ) : (
-                <select value={bankCode} onChange={(e) => { setBankCode(e.target.value); setVerifiedName(""); }}
-                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30">
-                  <option value="">Select your bank</option>
-                  {banks.map((b) => (
-                    <option key={b.code} value={b.code}>{b.name}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Account Number *</label>
-              <div className="flex gap-2">
-                <input
-                  value={accountNumber}
-                  onChange={(e) => { setAccountNumber(e.target.value.replace(/\D/g, "")); setVerifiedName(""); }}
-                  placeholder="0123456789"
-                  maxLength={10}
-                  className="flex-1 px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-                />
-                <button
-                  onClick={handleVerifyAccount}
-                  disabled={isVerifying || !bankCode || accountNumber.length < 10}
-                  className="px-4 py-2.5 rounded-xl bg-secondary text-secondary-foreground text-sm font-semibold disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isVerifying ? <Loader2 size={14} className="animate-spin" /> : "Verify"}
-                </button>
-              </div>
-              {verifiedName && (
-                <p className="flex items-center gap-1.5 text-sm text-green-600 mt-2">
-                  <CheckCircle2 size={14} /> {verifiedName}
-                </p>
-              )}
-            </div>
-
-            <div className="flex gap-2 pt-2">
-              <button onClick={() => setStep("type")}
-                className="flex-1 py-3 rounded-xl border border-border text-sm font-semibold text-foreground hover:bg-muted transition-colors">
-                Back
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting || !verifiedName}
-                className="flex-1 py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? <><Loader2 size={16} className="animate-spin" /> Setting up...</> : "Complete Setup"}
-              </button>
-            </div>
-          </div>
-        )}
-      </motion.div>
-    </div>
-  );
 };
 
 // ── List Product Modal ────────────────────────────────────────────────────────
@@ -519,8 +297,6 @@ const Marketplace = () => {
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [showListModal, setShowListModal] = useState(false);
-  const [showOnboardModal, setShowOnboardModal] = useState(false);
-  const [isSeller, setIsSeller] = useState<boolean | null>(null); // null = not checked yet
   const [realProducts, setRealProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -559,28 +335,24 @@ const Marketplace = () => {
     setRealProducts((prev) => [product, ...prev]);
   };
 
-  // Called when "Sell" button is clicked — checks onboarding status first
+  // Called when "Sell" button is clicked — verified sellers list directly,
+  // everyone else is sent to Profile to apply for a seller badge.
   const handleSellClick = async () => {
     try {
       const me = await getMe();
-      if (me.seller_type && me.paystack_subaccount_code) {
-        // Already onboarded — go straight to listing
-        setIsSeller(true);
+      if (me.is_seller) {
+        if (me.listing_cap !== -1 && me.active_listing_count >= me.listing_cap) {
+          toast.error(`You've reached your listing limit (${me.listing_cap}). Remove a listing to add a new one.`);
+          return;
+        }
         setShowListModal(true);
       } else {
-        // Not onboarded yet — show onboarding first
-        setIsSeller(false);
-        setShowOnboardModal(true);
+        toast.info("Apply to become a seller from your Profile to start listing products.");
+        navigate("/profile");
       }
     } catch {
       toast.error("Could not check seller status. Please try again.");
     }
-  };
-
-  const handleOnboardSuccess = () => {
-    setIsSeller(true);
-    setShowOnboardModal(false);
-    setShowListModal(true);
   };
 
   return (
@@ -657,12 +429,6 @@ const Marketplace = () => {
       </div>
 
       <AnimatePresence>
-        {showOnboardModal && (
-          <SellerOnboardingModal
-            onClose={() => setShowOnboardModal(false)}
-            onSuccess={handleOnboardSuccess}
-          />
-        )}
         {showListModal && (
           <ListProductModal
             onClose={() => setShowListModal(false)}

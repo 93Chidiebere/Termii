@@ -15,6 +15,7 @@ import { getMe } from "@/lib/api";
 import { useRoleStore } from "@/stores/roleStore";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
+
 const Landing = lazy(() => import("./pages/Landing"));
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -36,6 +37,7 @@ const OrderCallback = lazy(() => import("./pages/OrderCallback"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPostDetail = lazy(() => import("./pages/BlogPostDetail"));
+const SellerApplicationCallback = lazy(() => import("./pages/SellerApplicationCallback"));
 
 const queryClient = new QueryClient();
 
@@ -90,6 +92,7 @@ const App = () => {
               <Route path="/hair-twins/:id" element={<ProtectedRoute><HairTwinDetail /></ProtectedRoute>} />
               <Route path="/marketplace" element={<ProtectedRoute><AgeGate featureName="Marketplace"><Marketplace /></AgeGate></ProtectedRoute>} />
               <Route path="/product/:id" element={<ProtectedRoute><AgeGate featureName="Marketplace"><ProductDetail /></AgeGate></ProtectedRoute>} />
+              <Route path="/seller-application/callback" element={<ProtectedRoute><SellerApplicationCallback /></ProtectedRoute>} />
               <Route path="/orders/callback" element={<ProtectedRoute><OrderCallback /></ProtectedRoute>} />
               <Route path="/blog" element={<Blog />} />
               <Route path="/blog/:slug" element={<BlogPostDetail />} />

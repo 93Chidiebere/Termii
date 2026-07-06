@@ -600,6 +600,11 @@ export const applyForSeller = async (
   return response.data;
 };
 
+export const resumeApplicationPayment = async (): Promise<{ authorization_url: string; reference: string }> => {
+  const response = await apiClient.post("/seller-applications/resume-payment");
+  return response.data;
+};
+
 export const verifyApplicationPayment = async (
   reference: string
 ): Promise<SellerApplicationResponse> => {
