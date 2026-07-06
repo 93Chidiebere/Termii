@@ -372,19 +372,6 @@ export const verifyBankAccount = async (
   return response.data;
 };
 
-export interface OnboardSellerData {
-  seller_type: "individual" | "business";
-  business_name?: string;
-  cac_number?: string;
-  bank_code: string;
-  bank_account_number: string;
-}
-
-export const onboardSeller = async (data: OnboardSellerData) => {
-  const response = await apiClient.post("/sellers/onboard", data);
-  return response.data;
-};
-
 // ── Orders ────────────────────────────────────────────────────────────────────
 
 export interface ApiOrder {
@@ -571,5 +558,86 @@ export const getBlogPostBySlug = async (slug: string): Promise<BlogPost> => {
 
 export const markMessagesRead = async (partnerId: string) => {
   const response = await apiClient.post(`/chat/read/${partnerId}`);
+  return response.data;
+};
+
+// ── Seller Applications ────────────────────────────────────────────────────────
+
+export interface SellerApplicationCreateData {
+  seller_type: "individual" | "business";
+  full_name: string;
+  phone_number: string;
+  address: string;
+  nin_or_bvn?: string;
+  business_name?: string;
+  cac_number?: string;
+  tin?: string;
+  bank_code: string;
+  bank_account_number: string;
+  bank_account_name: string;
+  portfolio_image_urls?: string[];
+}
+
+export interface SellerApplicationResponse {
+  id: string;
+  seller_type: string;
+  full_name: string;
+  business_name?: string;
+  id_verification_status?: string;
+  cac_verification_status?: string;
+  fee_amount: number;
+  payment_status: string;
+  status: string;
+  rejection_reason?: string;
+  created_at: string;
+  reviewed_at?: string;
+}
+
+export const applyForSeller = async (
+  data: SellerApplicationCreateData
+): Promise<{ application_id: string; authorization_url: string; reference: string }> => {
+  const response = await apiClient.post("/seller-applications/apply", data);
+  return response.data;
+};
+
+export const verifyApplicationPayment = async (
+  reference: string
+): Promise<SellerApplicationResponse> => {
+  const response = await apiClient.get(`/seller-applications/verify/${reference}`);
+  return response.data;
+};
+
+export const getMyApplication = async (): Promise<SellerApplicationResponse | null> => {
+  const response = await apiClient.get("/seller-applications/me");
+  return response.data;
+};
+
+export interface SellerApplicationAdminView extends SellerApplicationResponse {
+  applicant_id: string;
+  applicant_email: string;
+  phone_number: string;
+  address: string;
+  bank_code: string;
+  bank_account_number: string;
+  bank_account_name?: string;
+  portfolio_image_urls: string[];
+  account_age_days_at_apply?: number;
+  payment_reference?: string;
+}
+
+export const getPendingApplications = async (): Promise<SellerApplicationAdminView[]> => {
+  const response = await apiClient.get("/seller-applications/admin/pending");
+  return response.data;
+};
+
+export const reviewApplication = async (
+  applicationId: string,
+  decision: "approve" | "reject",
+  rejectionReason?: string
+) => {
+  const response = await apiClient.post(`/seller-applications/admin/${applicationId}/review`, {
+    decision,
+    rejection_reason: rejectionReason,
+  });
   return response.data;
 };
