@@ -28,13 +28,14 @@ const Login = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Where the user was trying to go before being sent to login
   const from = (location.state as { from?: { pathname: string } })?.from?.pathname || "/feed";
 
   const {
     login, signup, signupStep, setSignupStep, signupData,
     updateSignupData, resetSignup, isLoading, error, clearError,
   } = useAuthStore();
+
+  const sessionExpired = searchParams.get("session") === "expired";
 
   const [showPassword, setShowPassword] = useState(false);
   const [isSignUp, setIsSignUp] = useState(searchParams.get("signup") === "true");
@@ -50,7 +51,6 @@ const Login = () => {
     if (searchParams.get("signup") === "true") setIsSignUp(true);
   }, [searchParams]);
 
-  // Clear errors when user starts typing
   useEffect(() => {
     if (error) clearError();
   }, [email, password]);
@@ -116,6 +116,12 @@ const Login = () => {
             {!isSignUp && (
               <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <h2 className="font-display text-xl font-semibold text-foreground mb-6 text-center">Welcome Back</h2>
+
+                {sessionExpired && !error && (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-700 text-sm text-center">
+                    Your session expired. Please log in again.
+                  </div>
+                )}
 
                 {error && (
                   <div className="mb-4 px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-sm text-center">

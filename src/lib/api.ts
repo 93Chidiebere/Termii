@@ -7,6 +7,7 @@ export const apiClient = axios.create({
   baseURL: BASE_URL,
 });
 
+// Request interceptor — attach token to every request
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("termii-token");
   if (token) {
@@ -14,6 +15,29 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Response interceptor — handle 401 globally
+// Instead of silently failing and reverting UI, log the user out cleanly
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Token is expired or invalid — clear everything and redirect to login
+      localStorage.removeItem("termii-token");
+
+      // Import dynamically to avoid circular dependency
+      import("@/stores/authStore").then(({ useAuthStore }) => {
+        useAuthStore.getState().logout();
+      });
+
+      // Only redirect if not already on login page
+      if (!window.location.pathname.startsWith("/login")) {
+        window.location.href = "/login?session=expired";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 
@@ -218,8 +242,13 @@ export const getMessageHistory = async (partnerId: string): Promise<ApiMessage[]
   return response.data;
 };
 
+// export const createChatSocket = (token: string): WebSocket => {
+//   const wsUrl = `wss://termii-production.up.railway.app/chat/ws?token=${token}`;
+//   return new WebSocket(wsUrl);
+// };
+
 export const createChatSocket = (token: string): WebSocket => {
-  const wsUrl = `wss://termii-production.up.railway.app/chat/ws?token=${token}`;
+  const wsUrl = `wss://api.isingala.com/chat/ws?token=${token}`;
   return new WebSocket(wsUrl);
 };
 
