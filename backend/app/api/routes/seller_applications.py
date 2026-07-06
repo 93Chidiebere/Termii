@@ -154,6 +154,33 @@ async def verify_application_payment(
     return _to_response(application)
 
 
+# ── POST /seller-applications/resume-payment — retry a stalled payment ────────
+@router.post("/resume-payment")
+async def resume_payment(current_user: User = Depends(get_current_user)):
+    application = await SellerApplication.find(
+        SellerApplication.applicant.id == current_user.id,  # type: ignore
+        SellerApplication.status == "pending_payment",
+    ).sort(-SellerApplication.created_at).first_or_none()
+
+    if not application:
+        raise HTTPException(status_code=404, detail="No pending application found")
+
+    reference = f"selapp_{uuid.uuid4().hex[:16]}"
+    transaction = await paystack.initialize_transaction(
+        email=current_user.email,
+        amount_kobo=application.fee_amount * 100,
+        reference=reference,
+        callback_url=CALLBACK_URL,
+    )
+    if not transaction:
+        raise HTTPException(status_code=502, detail="Could not initialize payment. Please try again.")
+
+    application.payment_reference = reference
+    await application.save()
+
+    return {"authorization_url": transaction.get("authorization_url"), "reference": reference}
+
+
 # ── GET /seller-applications/me — applicant checks their own status ───────────
 @router.get("/me", response_model=Optional[SellerApplicationResponse])
 async def get_my_application(current_user: User = Depends(get_current_user)):
