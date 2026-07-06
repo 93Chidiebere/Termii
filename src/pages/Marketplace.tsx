@@ -15,7 +15,7 @@ import {
 import { toast } from "sonner";
 import {
   Search, Star, TrendingUp, Sparkles, MapPin, Users,
-  ShoppingBag, ShieldAlert, Plus, Loader2, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
+  ShoppingBag, Plus, Loader2, X, Building2, User as UserIcon, CheckCircle2, BadgeCheck,
 } from "lucide-react";
 
 const sectionFilters = [
@@ -515,7 +515,6 @@ const ListProductModal = ({
 // ── Main Marketplace Page ─────────────────────────────────────────────────────
 const Marketplace = () => {
   const navigate = useNavigate();
-  const { isMinor } = useAuthStore();
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
   const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -583,23 +582,6 @@ const Marketplace = () => {
     setShowOnboardModal(false);
     setShowListModal(true);
   };
-
-  if (isMinor) {
-    return (
-      <AppLayout>
-        <div className="max-w-md mx-auto px-4 py-20 text-center">
-          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-            <ShieldAlert size={32} className="text-muted-foreground" />
-          </div>
-          <h1 className="font-display text-xl font-bold text-foreground mb-2">Access Restricted</h1>
-          <p className="text-sm text-muted-foreground mb-6">
-            The Marketplace is only available to members aged 16 and above.
-          </p>
-          <Link to="/feed" className="text-sm text-primary font-semibold hover:underline">← Back to Feed</Link>
-        </div>
-      </AppLayout>
-    );
-  }
 
   return (
     <AppLayout>
