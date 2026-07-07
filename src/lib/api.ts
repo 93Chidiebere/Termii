@@ -424,32 +424,6 @@ export const confirmDelivery = async (orderId: string): Promise<ApiOrder> => {
   return response.data;
 };
 
-// ── Admin: Seller Verification ─────────────────────────────────────────────────
-
-export interface PendingSeller {
-  id: string;
-  full_name: string;
-  email: string;
-  seller_type: string;
-  business_name?: string;
-  cac_number?: string;
-  bank_account_name?: string;
-  verification_status: string;
-}
-
-export const getPendingSellers = async (): Promise<PendingSeller[]> => {
-  const response = await apiClient.get("/sellers/pending");
-  return response.data;
-};
-
-export const verifySeller = async (
-  userId: string,
-  approve: boolean,
-  notes?: string
-) => {
-  const response = await apiClient.put(`/sellers/${userId}/verify`, { approve, notes });
-  return response.data;
-};
 
 // ── Admin: User Management ───────────────────────────────────────────────────
 
@@ -622,6 +596,9 @@ export interface SellerApplicationAdminView extends SellerApplicationResponse {
   applicant_email: string;
   phone_number: string;
   address: string;
+  nin_or_bvn?: string;
+  cac_number?: string;
+  tin?: string;
   bank_code: string;
   bank_account_number: string;
   bank_account_name?: string;

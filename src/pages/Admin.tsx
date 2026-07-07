@@ -20,9 +20,10 @@ const mockCreatorRequests: CreatorRequest[] = [];
 const mockFlaggedPosts: FlaggedPost[] = [];
 
 import {
-  getPendingSellers, verifySeller, type PendingSeller,
+  getPendingApplications, reviewApplication, type SellerApplicationAdminView,
   getAllUsers, updateUserStatus, type AdminUserData,
 } from "@/lib/api";
+
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -586,22 +587,22 @@ const BlogTab = () => {
 };
 
 
-/* ====== SELLERS TAB ====== */
+/* ====== SELLER APPLICATIONS TAB ====== */
 const SellersTab = () => {
-  const [pending, setPending] = useState<PendingSeller[]>([]);
+  const [pending, setPending] = useState<SellerApplicationAdminView[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [confirmAction, setConfirmAction] = useState<{ seller: PendingSeller; approve: boolean } | null>(null);
-  const [notes, setNotes] = useState("");
+  const [confirmAction, setConfirmAction] = useState<{ application: SellerApplicationAdminView; approve: boolean } | null>(null);
+  const [rejectionReason, setRejectionReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
   const loadPending = async () => {
     setIsLoading(true);
     try {
-      const data = await getPendingSellers();
+      const data = await getPendingApplications();
       setPending(data);
     } catch {
-      toast({ title: "Could not load pending sellers", variant: "destructive" });
+      toast({ title: "Could not load pending applications", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
@@ -613,18 +614,27 @@ const SellersTab = () => {
 
   const handleDecision = async () => {
     if (!confirmAction) return;
+    if (!confirmAction.approve && !rejectionReason.trim()) {
+      toast({ title: "A rejection reason is required", variant: "destructive" });
+      return;
+    }
     setIsSubmitting(true);
     try {
-      await verifySeller(confirmAction.seller.id, confirmAction.approve, notes || undefined);
+      await reviewApplication(
+        confirmAction.application.id,
+        confirmAction.approve ? "approve" : "reject",
+        confirmAction.approve ? undefined : rejectionReason.trim()
+      );
       toast({
-        title: confirmAction.approve ? "Seller verified" : "Seller rejected",
-        description: `${confirmAction.seller.business_name || confirmAction.seller.full_name} has been ${confirmAction.approve ? "approved" : "rejected"}.`,
+        title: confirmAction.approve ? "Seller approved" : "Application rejected",
+        description: `${confirmAction.application.business_name || confirmAction.application.full_name} has been ${confirmAction.approve ? "approved and issued a badge" : "rejected"}.`,
       });
-      setPending((prev) => prev.filter((s) => s.id !== confirmAction.seller.id));
+      setPending((prev) => prev.filter((a) => a.id !== confirmAction.application.id));
       setConfirmAction(null);
-      setNotes("");
-    } catch {
-      toast({ title: "Could not process this decision", variant: "destructive" });
+      setRejectionReason("");
+    } catch (err: any) {
+      const message = err?.response?.data?.detail || "Could not process this decision";
+      toast({ title: message, variant: "destructive" });
     } finally {
       setIsSubmitting(false);
     }
@@ -633,7 +643,7 @@ const SellersTab = () => {
   return (
     <div>
       <h2 className="font-display text-lg font-semibold text-foreground mb-4">
-        Pending Seller Verifications ({pending.length})
+        Pending Seller Applications ({pending.length})
       </h2>
 
       {isLoading ? (
@@ -642,15 +652,15 @@ const SellersTab = () => {
         </div>
       ) : pending.length === 0 ? (
         <div className="bg-card border border-border rounded-xl p-8 text-center text-sm text-muted-foreground">
-          No pending seller verifications
+          No pending seller applications
         </div>
       ) : (
         <div className="space-y-3">
-          {pending.map((seller) => (
-            <div key={seller.id} className="bg-card border border-border rounded-xl p-4">
+          {pending.map((application) => (
+            <div key={application.id} className="bg-card border border-border rounded-xl p-4">
               <div className="flex items-center gap-3 mb-3">
                 <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  {seller.seller_type === "business" ? (
+                  {application.seller_type === "business" ? (
                     <Building2 size={18} className="text-primary" />
                   ) : (
                     <UserIcon size={18} className="text-primary" />
@@ -658,39 +668,69 @@ const SellersTab = () => {
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-semibold text-foreground">
-                    {seller.business_name || seller.full_name}
+                    {application.business_name || application.full_name}
                   </p>
-                  <p className="text-xs text-muted-foreground">{seller.email}</p>
+                  <p className="text-xs text-muted-foreground">{application.applicant_email}</p>
                 </div>
                 <span className="text-xs font-semibold px-2 py-1 rounded-full bg-yellow-500/10 text-yellow-600 capitalize">
-                  {seller.seller_type}
+                  {application.seller_type}
                 </span>
               </div>
 
               <div className="space-y-1 text-sm mb-3">
-                {seller.cac_number && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Phone</span>
+                  <span className="text-foreground font-medium">{application.phone_number}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Address</span>
+                  <span className="text-foreground font-medium text-right max-w-[60%]">{application.address}</span>
+                </div>
+                {application.nin_or_bvn && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">CAC Number</span>
-                    <span className="text-foreground font-medium">{seller.cac_number}</span>
+                    <span className="text-muted-foreground">NIN / BVN</span>
+                    <span className="text-foreground font-medium">{application.nin_or_bvn}</span>
                   </div>
                 )}
-                {seller.bank_account_name && (
+                {application.cac_number && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">CAC Number</span>
+                    <span className="text-foreground font-medium">{application.cac_number}</span>
+                  </div>
+                )}
+                {application.tin && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">TIN</span>
+                    <span className="text-foreground font-medium">{application.tin}</span>
+                  </div>
+                )}
+                {application.bank_account_name && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Bank Account Name</span>
-                    <span className="text-foreground font-medium">{seller.bank_account_name}</span>
+                    <span className="text-foreground font-medium">{application.bank_account_name}</span>
+                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Fee Paid</span>
+                  <span className="text-foreground font-medium">₦{application.fee_amount.toLocaleString()}</span>
+                </div>
+                {application.account_age_days_at_apply !== undefined && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Account Age at Apply</span>
+                    <span className="text-foreground font-medium">{application.account_age_days_at_apply} days</span>
                   </div>
                 )}
               </div>
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setConfirmAction({ seller, approve: true })}
+                  onClick={() => setConfirmAction({ application, approve: true })}
                   className="flex-1 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
                 >
-                  <CheckCircle size={14} /> Verify
+                  <CheckCircle size={14} /> Approve
                 </button>
                 <button
-                  onClick={() => setConfirmAction({ seller, approve: false })}
+                  onClick={() => setConfirmAction({ application, approve: false })}
                   className="flex-1 py-2 rounded-xl bg-destructive text-destructive-foreground text-sm font-semibold hover:opacity-90 transition-opacity flex items-center justify-center gap-1.5"
                 >
                   <XCircle size={14} /> Reject
@@ -701,34 +741,36 @@ const SellersTab = () => {
         </div>
       )}
 
-      <Dialog open={!!confirmAction} onOpenChange={() => { setConfirmAction(null); setNotes(""); }}>
+      <Dialog open={!!confirmAction} onOpenChange={() => { setConfirmAction(null); setRejectionReason(""); }}>
         <DialogContent className="max-w-sm rounded-2xl">
           <DialogHeader>
             <DialogTitle className="font-display">
-              {confirmAction?.approve ? "Verify Seller?" : "Reject Seller?"}
+              {confirmAction?.approve ? "Approve Seller?" : "Reject Application?"}
             </DialogTitle>
             <DialogDescription>
               {confirmAction?.approve
-                ? `${confirmAction?.seller.business_name || confirmAction?.seller.full_name} will get the Verified Seller badge on all their listings.`
-                : `${confirmAction?.seller.business_name || confirmAction?.seller.full_name} will be marked as rejected and won't show the badge.`}
+                ? `${confirmAction?.application.business_name || confirmAction?.application.full_name} will get the Verified Seller badge and can start listing products.`
+                : `${confirmAction?.application.business_name || confirmAction?.application.full_name} will be rejected. The application fee is non-refundable, and they may reapply.`}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">
-                Internal notes <span className="text-muted-foreground">(optional, for your records)</span>
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. CAC certificate checked, matches business name..."
-                rows={3}
-                className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
-              />
-            </div>
+            {!confirmAction?.approve && (
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Rejection reason <span className="text-destructive">(required)</span>
+                </label>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(e) => setRejectionReason(e.target.value)}
+                  placeholder="e.g. CAC number could not be verified against business name..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-xl bg-background border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-none"
+                />
+              </div>
+            )}
             <button
               onClick={handleDecision}
-              disabled={isSubmitting}
+              disabled={isSubmitting || (!confirmAction?.approve && !rejectionReason.trim())}
               className={`w-full py-3 rounded-xl font-semibold text-sm transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 ${
                 confirmAction?.approve
                   ? "bg-primary text-primary-foreground hover:opacity-90"
@@ -737,7 +779,7 @@ const SellersTab = () => {
             >
               {isSubmitting ? (
                 <><Loader2 size={16} className="animate-spin" /> Processing...</>
-              ) : confirmAction?.approve ? "Confirm Verification" : "Confirm Rejection"}
+              ) : confirmAction?.approve ? "Confirm Approval" : "Confirm Rejection"}
             </button>
           </div>
         </DialogContent>
@@ -746,7 +788,7 @@ const SellersTab = () => {
   );
 };
 
-/* ====== SUSPEND/BAN TAB ====== */
+
 /* ====== SUSPEND/BAN TAB ====== */
 const SuspendBanTab = () => {
   const [users, setUsers] = useState<AdminUserData[]>([]);

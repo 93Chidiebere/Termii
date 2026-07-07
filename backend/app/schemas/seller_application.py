@@ -44,6 +44,9 @@ class SellerApplicationAdminView(SellerApplicationResponse):
     applicant_email: str
     phone_number: str
     address: str
+    nin_or_bvn: Optional[str] = None
+    cac_number: Optional[str] = None
+    tin: Optional[str] = None
     bank_code: str
     bank_account_number: str
     bank_account_name: str
