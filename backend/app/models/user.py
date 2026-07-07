@@ -1,6 +1,6 @@
 from beanie import Document, Indexed
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime
 from pydantic import Field
 
 class User(Document):
@@ -20,7 +20,8 @@ class User(Document):
     hair_treatments: Optional[List[str]] = None
 
     # ── Age verification (marketplace + messaging gate, 16+) ─────────────────
-    date_of_birth: Optional[date] = None
+    # Stored as datetime — MongoDB/BSON has no native date-only type.
+    date_of_birth: Optional[datetime] = None
     age_verified: bool = False
 
     # ── Seller / marketplace fields ───────────────────────────────────────────

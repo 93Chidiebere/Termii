@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from typing import List, Optional as Opt
-from datetime import date
+from datetime import date, datetime
 from pydantic import BaseModel as BM
 from app.schemas.user import UserCreate, UserResponse
 from app.models.user import User
@@ -15,13 +15,20 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 MINIMUM_AGE = 16
 
 
-# ── Helper: compute age from date of birth ─────────────────────────────────────
+# ── Helper: compute age from a date (or datetime) of birth ────────────────────
 def calculate_age(dob: date) -> int:
+    if isinstance(dob, datetime):
+        dob = dob.date()
     today = date.today()
     age = today.year - dob.year
     if (today.month, today.day) < (dob.month, dob.day):
         age -= 1
     return age
+
+
+# ── Helper: convert a plain date into a datetime for MongoDB storage ──────────
+def date_to_datetime(d: date) -> datetime:
+    return datetime.combine(d, datetime.min.time())
 
 
 # ── Helper: decode JWT and return the current user ────────────────────────────
@@ -62,7 +69,7 @@ async def register(user_in: UserCreate):
         full_name=user_in.full_name,
         username=user_in.username,
         hair_type=user_in.hair_type,
-        date_of_birth=user_in.date_of_birth,
+        date_of_birth=date_to_datetime(user_in.date_of_birth),
         age_verified=age >= MINIMUM_AGE,
     )
     await user.insert()
@@ -131,6 +138,12 @@ async def update_me(
     current_user: User = Depends(get_current_user),
 ):
     data = updates.model_dump(exclude_none=True)
+
+    # Convert incoming plain date to datetime before it touches the document —
+    # MongoDB/BSON cannot encode a bare datetime.date.
+    if "date_of_birth" in data:
+        data["date_of_birth"] = date_to_datetime(data["date_of_birth"])
+
     for key, value in data.items():
         setattr(current_user, key, value)
 
