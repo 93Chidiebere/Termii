@@ -36,8 +36,8 @@ const treatmentOptions = [
   "Transitioning", "Fully Natural", "Loc'd",
 ];
 
-const INDIVIDUAL_FEE = 10000;
-const CORPORATE_FEE = 50000;
+const INDIVIDUAL_FEE = 25000;
+const CORPORATE_FEE = 100000;
 
 const InitialsAvatar = ({ name, size = "lg" }: { name: string; size?: "sm" | "lg" }) => {
   const initials = name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
