@@ -1,5 +1,8 @@
-import { useState, useEffect } from "react";
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Send, Loader2, ChevronDown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import {
+  Heart, MessageCircle, Bookmark, Share2, MoreHorizontal,
+  Send, Loader2, ChevronDown, Image as ImageIcon,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
 import type { Post } from "@/types";
@@ -7,18 +10,211 @@ import { useFollowStore } from "@/stores/followStore";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
-import { toggleLike, toggleSave, getComments, addComment, type ApiComment } from "@/lib/api";
+import {
+  toggleLike, toggleSave, getComments, addComment,
+  toggleCommentLike, getMentionSuggestions,
+  type ApiComment, type ApiUser,
+} from "@/lib/api";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { formatDistanceToNow } from "date-fns";
 import { generateShareCard } from "@/lib/generateShareCard";
-import { Image as ImageIcon } from "lucide-react";
 
 interface PostCardProps {
   post: Post;
   index: number;
 }
 
+// ── Mention-aware input ───────────────────────────────────────────────────────
+const MentionInput = ({
+  value,
+  onChange,
+  onSubmit,
+  placeholder,
+  disabled,
+  isPosting,
+  autoFocus,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  placeholder: string;
+  disabled?: boolean;
+  isPosting: boolean;
+  autoFocus?: boolean;
+}) => {
+  const [suggestions, setSuggestions] = useState<ApiUser[]>([]);
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    onChange(val);
+
+    // Detect @mention being typed
+    const cursorPos = e.target.selectionStart || 0;
+    const textUpToCursor = val.slice(0, cursorPos);
+    const mentionMatch = textUpToCursor.match(/@([\w.]*)$/);
+
+    if (mentionMatch) {
+      const query = mentionMatch[1];
+      setMentionQuery(query);
+      if (query.length >= 1) {
+        try {
+          const results = await getMentionSuggestions(query);
+          setSuggestions(results.slice(0, 5));
+        } catch {
+          setSuggestions([]);
+        }
+      } else {
+        setSuggestions([]);
+      }
+    } else {
+      setMentionQuery(null);
+      setSuggestions([]);
+    }
+  };
+
+  const handleSelectMention = (user: ApiUser) => {
+    if (!inputRef.current) return;
+    const cursorPos = inputRef.current.selectionStart || 0;
+    const textUpToCursor = value.slice(0, cursorPos);
+    const mentionStart = textUpToCursor.lastIndexOf("@");
+    const newValue =
+      value.slice(0, mentionStart) +
+      `@${user.full_name.toLowerCase().replace(/\s+/g, "")} ` +
+      value.slice(cursorPos);
+    onChange(newValue);
+    setSuggestions([]);
+    setMentionQuery(null);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  };
+
+  return (
+    <div className="relative flex-1">
+      <input
+        ref={inputRef}
+        autoFocus={autoFocus}
+        value={value}
+        onChange={handleChange}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            onSubmit(e as any);
+          }
+        }}
+        placeholder={placeholder}
+        disabled={disabled}
+        className="w-full text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+      />
+
+      {/* @mention suggestions dropdown */}
+      {suggestions.length > 0 && (
+        <div className="absolute bottom-full left-0 mb-1 w-56 bg-card border border-border rounded-xl shadow-lg z-50 overflow-hidden">
+          {suggestions.map((u) => (
+            <button
+              key={u.id}
+              type="button"
+              onClick={() => handleSelectMention(u)}
+              className="w-full flex items-center gap-2 px-3 py-2 hover:bg-muted transition-colors text-left"
+            >
+              <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0">
+                {u.avatar_url ? (
+                  <img src={u.avatar_url} className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold text-primary">
+                    {u.full_name[0]?.toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs font-semibold text-foreground truncate">{u.full_name}</p>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Comment / Reply row with like button ─────────────────────────────────────
+const CommentRow = ({
+  comment,
+  currentUserId,
+  onReply,
+}: {
+  comment: ApiComment;
+  currentUserId: string;
+  onReply?: () => void;
+}) => {
+  const [liked, setLiked] = useState(comment.is_liked ?? false);
+  const [likeCount, setLikeCount] = useState(comment.likes_count ?? 0);
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newLiked = !liked;
+    setLiked(newLiked);
+    setLikeCount((c) => newLiked ? c + 1 : c - 1);
+    try {
+      const result = await toggleCommentLike(comment.id);
+      setLiked(result.liked);
+      setLikeCount(result.likes_count);
+    } catch {
+      setLiked(!newLiked);
+      setLikeCount((c) => newLiked ? c - 1 : c + 1);
+    }
+  };
+
+  return (
+    <div className="flex items-start gap-1.5 group">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-foreground">
+          <span className="font-semibold">{comment.user_name}</span>{" "}
+          {/* Render @mentions as highlighted */}
+          {comment.text.split(/(@[\w.]+)/g).map((part, i) =>
+            part.startsWith("@") ? (
+              <span key={i} className="text-primary font-medium">{part}</span>
+            ) : (
+              <span key={i}>{part}</span>
+            )
+          )}
+        </p>
+        <div className="flex items-center gap-3 mt-0.5">
+          <p className="text-[11px] text-muted-foreground">
+            {formatDistanceToNow(new Date(comment.created_at + "Z"), { addSuffix: true })}
+          </p>
+          {likeCount > 0 && (
+            <span className="text-[11px] text-muted-foreground">{likeCount} like{likeCount !== 1 ? "s" : ""}</span>
+          )}
+          {onReply && (
+            <button
+              onClick={onReply}
+              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Reply
+            </button>
+          )}
+        </div>
+      </div>
+      {/* Like button on comment/reply */}
+      <button
+        onClick={handleLike}
+        className="mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity active:scale-125 flex-shrink-0"
+        aria-label="Like comment"
+      >
+        <Heart
+          size={13}
+          className={liked ? "fill-terracotta text-terracotta" : "text-muted-foreground"}
+          strokeWidth={1.5}
+        />
+      </button>
+    </div>
+  );
+};
+
+
+// ── Main PostCard ─────────────────────────────────────────────────────────────
 export const PostCard = ({ post, index }: PostCardProps) => {
   const { user } = useAuthStore();
   const [liked, setLiked] = useState(post.liked ?? false);
@@ -31,7 +227,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const following = isFollowing(post.userId);
   const isOwnPost = user?.id === post.userId;
 
-  // ── Inline comments state ────────────────────────────────────────────────
+  // Comments state
   const [previewComment, setPreviewComment] = useState<ApiComment | null>(null);
   const [commentCount, setCommentCount] = useState(post.comments);
   const [expanded, setExpanded] = useState(false);
@@ -41,23 +237,16 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const [isPosting, setIsPosting] = useState(false);
   const [isGeneratingCard, setIsGeneratingCard] = useState(false);
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState("");
   const [expandedReplies, setExpandedReplies] = useState<Set<string>>(new Set());
 
-  // Fetch just one preview comment on mount (cheap, no full list)
+  // Preview fetch
   useEffect(() => {
     if (commentCount === 0) return;
     let cancelled = false;
-    const loadPreview = async () => {
-      try {
-        const data = await getComments(post.id);
-        if (!cancelled && data.length > 0) {
-          setPreviewComment(data[data.length - 1]); // most recent
-        }
-      } catch {
-        // silently fail — preview is non-critical
-      }
-    };
-    loadPreview();
+    getComments(post.id).then((data) => {
+      if (!cancelled && data.length > 0) setPreviewComment(data[data.length - 1]);
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, [post.id, commentCount]);
 
@@ -77,25 +266,38 @@ export const PostCard = ({ post, index }: PostCardProps) => {
     }
   };
 
-  const handlePostComment = async (e: React.FormEvent, parentId?: string) => {
+  const handlePostComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
     setIsPosting(true);
     try {
-      const comment = await addComment(post.id, newComment.trim(), parentId);
+      const comment = await addComment(post.id, newComment.trim());
       setAllComments((prev) => [...prev, comment]);
-      if (!parentId) {
-        setPreviewComment(comment);
-      } else {
-        // Auto-expand replies for the parent we just replied to
-        setExpandedReplies((prev) => new Set(prev).add(parentId));
-      }
+      setPreviewComment(comment);
       setCommentCount((c) => c + 1);
       setNewComment("");
-      setReplyingTo(null);
       if (!expanded) setExpanded(true);
     } catch {
       toast({ title: "Could not post comment. Please try again." });
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const handlePostReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    if (!replyText.trim()) return;
+    setIsPosting(true);
+    try {
+      const comment = await addComment(post.id, replyText.trim(), parentId);
+      setAllComments((prev) => [...prev, comment]);
+      setExpandedReplies((prev) => new Set(prev).add(parentId));
+      setCommentCount((c) => c + 1);
+      setReplyText("");
+      setReplyingTo(null);
+      if (!expanded) setExpanded(true);
+    } catch {
+      toast({ title: "Could not post reply. Please try again." });
     } finally {
       setIsPosting(false);
     }
@@ -110,14 +312,14 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const handleLike = async () => {
     const newLiked = !liked;
     setLiked(newLiked);
-    setLikeCount((c) => (newLiked ? c + 1 : c - 1));
+    setLikeCount((c) => newLiked ? c + 1 : c - 1);
     try {
       const result = await toggleLike(post.id);
       setLiked(result.liked);
       setLikeCount(result.likes_count);
     } catch {
       setLiked(!newLiked);
-      setLikeCount((c) => (newLiked ? c - 1 : c + 1));
+      setLikeCount((c) => newLiked ? c - 1 : c + 1);
     }
   };
 
@@ -129,9 +331,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
       setSaved(result.saved);
       toast({
         title: result.saved ? "Saved" : "Removed from saved",
-        description: result.saved
-          ? "Find it in Profile → Saved."
-          : "Post removed from your saved list.",
+        description: result.saved ? "Find it in Profile → Saved." : "Post removed from your saved list.",
       });
     } catch {
       setSaved(!newSaved);
@@ -150,7 +350,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
       toast({ title: "Card sharing is only available for photo posts right now." });
       return;
     }
-
     setIsGeneratingCard(true);
     try {
       const blob = await generateShareCard({
@@ -159,28 +358,21 @@ export const PostCard = ({ post, index }: PostCardProps) => {
         userAvatarUrl: post.user.avatar,
         caption: post.caption,
       });
-
-      const file = new File([blob], "termii-africa-post.jpg", { type: "image/jpeg" });
-
-      // Try native share sheet first (mobile)
+      const file = new File([blob], "isi-ngala-post.jpg", { type: "image/jpeg" });
       if (navigator.share && navigator.canShare?.({ files: [file] })) {
         await navigator.share({
           files: [file],
-          title: "Termii Africa",
-          text: `Check out ${post.user.displayName}'s post on Termii Africa! ${window.location.origin}/post/${post.id}`,
+          title: "Isi Ngala",
+          text: `Check out ${post.user.displayName}'s post on Isi Ngala! ${window.location.origin}/post/${post.id}`,
         });
       } else {
-        // Fallback: download the image (desktop)
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "termii-africa-post.jpg";
+        a.download = "isi-ngala-post.jpg";
         a.click();
         URL.revokeObjectURL(url);
-        toast({
-          title: "Card downloaded!",
-          description: "Share it on Instagram, Facebook, or X.",
-        });
+        toast({ title: "Card downloaded!", description: "Share it on Instagram, Facebook, or X." });
       }
     } catch {
       toast({ title: "Could not generate share card. Please try again." });
@@ -199,11 +391,8 @@ export const PostCard = ({ post, index }: PostCardProps) => {
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-3 p-4">
         {post.user.avatar ? (
-          <img
-            src={post.user.avatar}
-            alt={post.user.displayName}
-            className="w-10 h-10 rounded-full object-cover ring-2 ring-gold/30"
-          />
+          <img src={post.user.avatar} alt={post.user.displayName}
+            className="w-10 h-10 rounded-full object-cover ring-2 ring-gold/30" />
         ) : (
           <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center ring-2 ring-gold/30">
             <span className="text-sm font-bold text-primary">
@@ -211,27 +400,20 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             </span>
           </div>
         )}
-
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm text-foreground truncate">
-            {post.user.displayName}
-          </p>
+          <p className="font-semibold text-sm text-foreground truncate">{post.user.displayName}</p>
           <p className="text-xs text-muted-foreground">@{post.user.username}</p>
         </div>
-
         {!isOwnPost && (
           <button
             onClick={() => toggleFollow(post.userId)}
             className={`text-xs font-semibold px-3 py-1 rounded-full transition-colors ${
-              following
-                ? "bg-muted text-muted-foreground"
-                : "bg-primary text-primary-foreground"
+              following ? "bg-muted text-muted-foreground" : "bg-primary text-primary-foreground"
             }`}
           >
             {following ? "Following" : "Follow"}
           </button>
         )}
-
         {!isOwnPost && (
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
@@ -248,7 +430,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             </PopoverContent>
           </Popover>
         )}
-
         {post.hairType && (
           <span className="text-xs font-medium bg-secondary text-secondary-foreground px-2.5 py-1 rounded-full">
             {post.hairType}
@@ -260,22 +441,12 @@ export const PostCard = ({ post, index }: PostCardProps) => {
       {post.image ? (
         isVideo ? (
           <div className="relative bg-muted">
-            <video
-              src={post.image}
-              controls
-              className="w-full max-h-96"
-              preload="metadata"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <video src={post.image} controls className="w-full max-h-96" preload="metadata"
+              onClick={(e) => e.stopPropagation()} />
           </div>
         ) : (
           <Link to={`/post/${post.id}`} className="relative aspect-[4/5] bg-muted block">
-            <img
-              src={post.image}
-              alt={post.caption}
-              className="w-full h-full object-cover"
-              loading="lazy"
-            />
+            <img src={post.image} alt={post.caption} className="w-full h-full object-cover" loading="lazy" />
           </Link>
         )
       ) : (
@@ -298,7 +469,6 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             <button onClick={handleToggleExpand} aria-label="Toggle comments">
               <MessageCircle size={24} className="text-foreground" strokeWidth={1.5} />
             </button>
-
             <Popover>
               <PopoverTrigger asChild>
                 <button aria-label="Share post">
@@ -306,36 +476,24 @@ export const PostCard = ({ post, index }: PostCardProps) => {
                 </button>
               </PopoverTrigger>
               <PopoverContent align="start" className="w-56 p-1.5 rounded-xl">
-                <button
-                  onClick={handleShare}
-                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left"
-                >
-                  <Share2 size={16} className="text-muted-foreground" />
-                  Copy link
+                <button onClick={handleShare}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left">
+                  <Share2 size={16} className="text-muted-foreground" /> Copy link
                 </button>
                 {!isVideo && post.image && (
-                  <button
-                    onClick={handleShareAsCard}
-                    disabled={isGeneratingCard}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left disabled:opacity-60"
-                  >
-                    {isGeneratingCard ? (
-                      <Loader2 size={16} className="animate-spin text-muted-foreground" />
-                    ) : (
-                      <ImageIcon size={16} className="text-muted-foreground" />
-                    )}
+                  <button onClick={handleShareAsCard} disabled={isGeneratingCard}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg hover:bg-muted transition-colors text-sm text-foreground text-left disabled:opacity-60">
+                    {isGeneratingCard
+                      ? <Loader2 size={16} className="animate-spin text-muted-foreground" />
+                      : <ImageIcon size={16} className="text-muted-foreground" />}
                     Share as image card
                   </button>
                 )}
               </PopoverContent>
             </Popover>
-
           </div>
-          <button
-            onClick={handleSave}
-            aria-label={saved ? "Unsave post" : "Save post"}
-            className="transition-transform active:scale-110"
-          >
+          <button onClick={handleSave} aria-label={saved ? "Unsave post" : "Save post"}
+            className="transition-transform active:scale-110">
             <Bookmark
               size={24}
               className={saved ? "fill-primary text-primary" : "text-foreground"}
@@ -349,23 +507,26 @@ export const PostCard = ({ post, index }: PostCardProps) => {
         </p>
         <p className="text-sm text-foreground leading-relaxed">
           <span className="font-semibold">{post.user.username}</span>{" "}
-          {post.caption}
+          {/* Render @mentions in caption */}
+          {post.caption.split(/(@[\w.]+)/g).map((part, i) =>
+            part.startsWith("@") ? (
+              <span key={i} className="text-primary font-medium">{part}</span>
+            ) : (
+              <span key={i}>{part}</span>
+            )
+          )}
         </p>
         <div className="flex flex-wrap gap-1.5 mt-2">
           {post.tags.slice(0, 3).map((tag) => (
-            <span key={tag} className="text-xs text-primary font-medium">
-              #{tag}
-            </span>
+            <span key={tag} className="text-xs text-primary font-medium">#{tag}</span>
           ))}
         </div>
 
-        {/* ── Comment preview (Instagram-style) ──────────────────────────── */}
+        {/* Comment preview */}
         {commentCount > 0 && !expanded && (
           <div className="mt-2">
-            <button
-              onClick={handleToggleExpand}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <button onClick={handleToggleExpand}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               View all {commentCount} comment{commentCount !== 1 ? "s" : ""}
             </button>
             {previewComment && (
@@ -377,7 +538,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
           </div>
         )}
 
-        {/* ── Expanded inline comment panel ──────────────────────────────── */}
+        {/* Expanded comment panel */}
         <AnimatePresence>
           {expanded && (
             <motion.div
@@ -386,10 +547,8 @@ export const PostCard = ({ post, index }: PostCardProps) => {
               exit={{ opacity: 0, height: 0 }}
               className="overflow-hidden"
             >
-              <button
-                onClick={handleToggleExpand}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3 mb-2"
-              >
+              <button onClick={handleToggleExpand}
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors mt-3 mb-2">
                 <ChevronDown size={14} className="rotate-180" /> Hide comments
               </button>
 
@@ -410,67 +569,53 @@ export const PostCard = ({ post, index }: PostCardProps) => {
 
                       return (
                         <div key={c.id}>
-                          <p className="text-sm text-foreground">
-                            <span className="font-semibold">{c.user_name}</span>{" "}
-                            {c.text}
-                          </p>
-                          <div className="flex items-center gap-3 mt-0.5">
-                            <p className="text-[11px] text-muted-foreground">
-                              {formatDistanceToNow(new Date(c.created_at + "Z"), { addSuffix: true })}
-                            </p>
-                            <button
-                              onClick={() => setReplyingTo(isReplyingHere ? null : c.id)}
-                              className="text-[11px] font-semibold text-muted-foreground hover:text-foreground transition-colors"
-                            >
-                              Reply
-                            </button>
-                          </div>
+                          <CommentRow
+                            comment={c}
+                            currentUserId={user?.id || ""}
+                            onReply={() => {
+                              setReplyingTo(isReplyingHere ? null : c.id);
+                              setReplyText("");
+                            }}
+                          />
 
-                          {/* Reply input for this specific comment */}
+                          {/* Reply input */}
                           {isReplyingHere && (
                             <form
-                              onSubmit={(e) => handlePostComment(e, c.id)}
-                              className="flex items-center gap-2 mt-2 ml-4"
+                              onSubmit={(e) => handlePostReply(e, c.id)}
+                              className="flex items-center gap-2 mt-2 ml-4 border-b border-border pb-1"
                             >
-                              <input
-                                autoFocus
-                                value={newComment}
-                                onChange={(e) => setNewComment(e.target.value)}
+                              <MentionInput
+                                value={replyText}
+                                onChange={setReplyText}
+                                onSubmit={(e) => handlePostReply(e, c.id)}
                                 placeholder={`Reply to ${c.user_name}...`}
-                                className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none border-b border-border pb-1"
+                                isPosting={isPosting}
+                                autoFocus
                               />
-                              <button
-                                type="submit"
-                                disabled={!newComment.trim() || isPosting}
-                                className="text-primary disabled:opacity-40"
-                              >
+                              <button type="submit" disabled={!replyText.trim() || isPosting}
+                                className="text-primary disabled:opacity-40 flex-shrink-0">
                                 {isPosting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                               </button>
                             </form>
                           )}
 
-                          {/* Replies — collapsed by default */}
+                          {/* Replies */}
                           {replies.length > 0 && (
                             <div className="ml-4 mt-2">
                               {!showReplies ? (
                                 <button
                                   onClick={() => setExpandedReplies((prev) => new Set(prev).add(c.id))}
-                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                                >
+                                  className="text-xs text-muted-foreground hover:text-foreground transition-colors">
                                   — View {replies.length} {replies.length === 1 ? "reply" : "replies"}
                                 </button>
                               ) : (
                                 <div className="space-y-2">
                                   {replies.map((r) => (
-                                    <div key={r.id}>
-                                      <p className="text-sm text-foreground">
-                                        <span className="font-semibold">{r.user_name}</span>{" "}
-                                        {r.text}
-                                      </p>
-                                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                                        {formatDistanceToNow(new Date(r.created_at + "Z"), { addSuffix: true })}
-                                      </p>
-                                    </div>
+                                    <CommentRow
+                                      key={r.id}
+                                      comment={r}
+                                      currentUserId={user?.id || ""}
+                                    />
                                   ))}
                                 </div>
                               )}
@@ -482,19 +627,17 @@ export const PostCard = ({ post, index }: PostCardProps) => {
                 )}
               </div>
 
-              <form onSubmit={(e) => handlePostComment(e)} className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
-                <input
-                  value={replyingTo ? "" : newComment}
-                  onChange={(e) => setNewComment(e.target.value)}
-                  placeholder="Add a comment..."
-                  disabled={!!replyingTo}
-                  className="flex-1 text-sm bg-transparent text-foreground placeholder:text-muted-foreground focus:outline-none disabled:opacity-50"
+              {/* New comment input with @mention */}
+              <form onSubmit={handlePostComment} className="flex items-center gap-2 mt-3 pt-3 border-t border-border">
+                <MentionInput
+                  value={newComment}
+                  onChange={setNewComment}
+                  onSubmit={handlePostComment}
+                  placeholder="Add a comment... (use @ to mention)"
+                  isPosting={isPosting}
                 />
-                <button
-                  type="submit"
-                  disabled={!newComment.trim() || isPosting || !!replyingTo}
-                  className="text-primary disabled:opacity-40"
-                >
+                <button type="submit" disabled={!newComment.trim() || isPosting}
+                  className="text-primary disabled:opacity-40 flex-shrink-0">
                   {isPosting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 </button>
               </form>

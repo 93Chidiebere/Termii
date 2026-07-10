@@ -7,6 +7,9 @@ from app.api.routes.auth import get_current_user
 from beanie import Document
 from datetime import datetime
 from pydantic import Field
+import re
+import asyncio
+import json
 
 router = APIRouter()
 
@@ -44,6 +47,16 @@ class PostComment(Document):
         name = "post_comments"
 
 
+# ── Comment Like model ────────────────────────────────────────────────────────
+class CommentLike(Document):
+    comment_id: str
+    user_id: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+    class Settings:
+        name = "comment_likes"
+
+
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class PostCreate(BaseModel):
     caption: str
@@ -66,6 +79,8 @@ class CommentResponse(BaseModel):
     text: str
     parent_comment_id: Optional[str] = None
     created_at: str
+    likes_count: int = 0
+    is_liked: bool = False
 
 
 class PostResponse(BaseModel):
@@ -87,7 +102,7 @@ class PostResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# ── Helper ────────────────────────────────────────────────────────────────────
+# ── Helpers ───────────────────────────────────────────────────────────────────
 async def build_post_response(post: Post, user: User, current_user_id: str) -> PostResponse:
     post_id = str(post.id)
     likes_count = await PostLike.find(PostLike.post_id == post_id).count()
@@ -118,6 +133,128 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
         is_liked=is_liked,
         is_saved=is_saved,
     )
+
+
+async def build_comment_response(
+    comment: PostComment,
+    current_user_id: str
+) -> CommentResponse:
+    comment_id = str(comment.id)
+    likes_count = await CommentLike.find(
+        CommentLike.comment_id == comment_id
+    ).count()
+    is_liked = await CommentLike.find_one(
+        CommentLike.comment_id == comment_id,
+        CommentLike.user_id == current_user_id
+    ) is not None
+    return CommentResponse(
+        id=comment_id,
+        post_id=comment.post_id,
+        user_id=comment.user_id,
+        user_name=comment.user_name,
+        text=comment.text,
+        parent_comment_id=comment.parent_comment_id,
+        created_at=comment.created_at.isoformat(),
+        likes_count=likes_count,
+        is_liked=is_liked,
+    )
+
+
+def extract_mentions(text: str) -> List[str]:
+    """Extract @username mentions from text. Returns list of usernames."""
+    return re.findall(r"@([\w.]+)", text)
+
+
+async def send_push_to_all(
+    title: str,
+    body: str,
+    url: str,
+    exclude_user_id: str,
+) -> None:
+    """Send a push notification to every user who has a subscription, except the actor."""
+    try:
+        from app.models.push_subscription import PushSubscription
+        from app.services.push_notifications import send_push_notification
+
+        subscriptions = await PushSubscription.find(
+            {"user_id": {"$ne": exclude_user_id}}
+        ).to_list()
+
+        if subscriptions:
+            await asyncio.gather(*[
+                send_push_notification(
+                    subscription={
+                        "endpoint": s.endpoint,
+                        "p256dh": s.p256dh,
+                        "auth": s.auth,
+                    },
+                    title=title,
+                    body=body,
+                    url=url,
+                )
+                for s in subscriptions
+            ])
+    except Exception:
+        pass
+
+
+async def send_push_to_user(
+    user_id: str,
+    title: str,
+    body: str,
+    url: str,
+) -> None:
+    """Send push notification to a specific user."""
+    try:
+        from app.models.push_subscription import PushSubscription
+        from app.services.push_notifications import send_push_notification
+
+        subscriptions = await PushSubscription.find(
+            PushSubscription.user_id == user_id
+        ).to_list()
+
+        if subscriptions:
+            await asyncio.gather(*[
+                send_push_notification(
+                    subscription={
+                        "endpoint": s.endpoint,
+                        "p256dh": s.p256dh,
+                        "auth": s.auth,
+                    },
+                    title=title,
+                    body=body,
+                    url=url,
+                )
+                for s in subscriptions
+            ])
+    except Exception:
+        pass
+
+
+async def send_ws_notification(
+    recipient_id: str,
+    notification_type: str,
+    title: str,
+    text: str,
+    link: str,
+    sender_id: str,
+    sender_name: str,
+) -> None:
+    """Send in-app WebSocket notification to a specific user."""
+    try:
+        from app.services.chat_manager import chat_manager
+        payload = json.dumps({
+            "type": "notification",
+            "notification_type": notification_type,
+            "title": title,
+            "text": text,
+            "link": link,
+            "sender_id": sender_id,
+            "sender_name": sender_name,
+        })
+        await chat_manager.send_personal_message(payload, recipient_id)
+    except Exception:
+        pass
 
 
 # ── POST /posts/ — create a new post ─────────────────────────────────────────
@@ -151,48 +288,50 @@ async def create_post(
     )
     await post.insert()
 
-    # Send push notifications to followers
-    try:
-        from app.models.push_subscription import PushSubscription
-        from app.services.push_notifications import send_push_notification
-        from app.api.routes.follows import Follow
-        import asyncio
+    post_id = str(post.id)
+    actor_id = str(current_user.id)
+    actor_name = current_user.full_name
+    caption_preview = post.caption[:80] + ("..." if len(post.caption) > 80 else "")
 
-        # Get all followers of the poster
-        followers = await Follow.find(
-            Follow.following_id == str(current_user.id)
-        ).to_list()
+    # ── Push to ALL users (excluding the poster) ──────────────────────────
+    asyncio.create_task(send_push_to_all(
+        title=f"{actor_name} just posted on Isi Ngala",
+        body=caption_preview,
+        url=f"/post/{post_id}",
+        exclude_user_id=actor_id,
+    ))
 
-        follower_ids = [f.follower_id for f in followers]
-
-        if follower_ids:
-            # Get their push subscriptions
-            subscriptions = await PushSubscription.find(
-                {"user_id": {"$in": follower_ids}}
-            ).to_list()
-
-            # Send to all concurrently
-            if subscriptions:
-                await asyncio.gather(*[
-                    send_push_notification(
-                        subscription={
-                            "endpoint": s.endpoint,
-                            "p256dh": s.p256dh,
-                            "auth": s.auth,
-                        },
-                        title=f"{current_user.full_name} just posted",
-                        body=post.caption[:80] + ("..." if len(post.caption) > 80 else ""),
-                        url=f"/post/{str(post.id)}",
+    # ── Handle @mentions in caption ───────────────────────────────────────
+    mentioned_usernames = extract_mentions(post.caption)
+    if mentioned_usernames:
+        async def notify_mentions():
+            for username in set(mentioned_usernames):
+                mentioned_user = await User.find_one(User.username == username)
+                if mentioned_user and str(mentioned_user.id) != actor_id:
+                    mentioned_id = str(mentioned_user.id)
+                    await asyncio.gather(
+                        send_ws_notification(
+                            recipient_id=mentioned_id,
+                            notification_type="mention",
+                            title=actor_name,
+                            text=f"mentioned you in a post",
+                            link=f"/post/{post_id}",
+                            sender_id=actor_id,
+                            sender_name=actor_name,
+                        ),
+                        send_push_to_user(
+                            user_id=mentioned_id,
+                            title=f"{actor_name} mentioned you",
+                            body=caption_preview,
+                            url=f"/post/{post_id}",
+                        ),
                     )
-                    for s in subscriptions
-                ])
-    except Exception:
-        pass  # Never let push notification failure break post creation
-    
-    return await build_post_response(post, current_user, str(current_user.id))
+        asyncio.create_task(notify_mentions())
+
+    return await build_post_response(post, current_user, actor_id)
 
 
-# ── GET /posts/ — fetch all posts (feed) — public ────────────────────────────
+# ── GET /posts/ — fetch all posts (feed) ─────────────────────────────────────
 @router.get("/", response_model=List[PostResponse])
 async def get_posts():
     posts = await Post.find_all().sort(-Post.created_at).to_list()
@@ -205,7 +344,7 @@ async def get_posts():
     return result
 
 
-# ── GET /posts/my — fetch current user's posts ───────────────────────────────
+# ── GET /posts/my ─────────────────────────────────────────────────────────────
 @router.get("/my", response_model=List[PostResponse])
 async def get_my_posts(current_user: User = Depends(get_current_user)):
     posts = await Post.find(
@@ -217,7 +356,7 @@ async def get_my_posts(current_user: User = Depends(get_current_user)):
     return result
 
 
-# ── GET /posts/saved — fetch current user's saved posts ──────────────────────
+# ── GET /posts/saved ──────────────────────────────────────────────────────────
 @router.get("/saved", response_model=List[PostResponse])
 async def get_saved_posts(current_user: User = Depends(get_current_user)):
     saves = await PostSave.find(
@@ -234,7 +373,7 @@ async def get_saved_posts(current_user: User = Depends(get_current_user)):
     return result
 
 
-# ── GET /posts/{post_id} — fetch single post ─────────────────────────────────
+# ── GET /posts/{post_id} ──────────────────────────────────────────────────────
 @router.get("/{post_id}", response_model=PostResponse)
 async def get_post(post_id: str):
     post = await Post.get(post_id)
@@ -247,7 +386,7 @@ async def get_post(post_id: str):
     return await build_post_response(post, user, "")
 
 
-# ── POST /posts/{post_id}/like — toggle like ─────────────────────────────────
+# ── POST /posts/{post_id}/like — toggle post like ────────────────────────────
 @router.post("/{post_id}/like")
 async def toggle_like(
     post_id: str,
@@ -272,19 +411,26 @@ async def toggle_like(
         try:
             await post.fetch_link(Post.user)
             post_owner = post.user
-            if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
-                from app.services.chat_manager import chat_manager
-                import json
-                payload = json.dumps({
-                    "type": "notification",
-                    "notification_type": "like",
-                    "title": current_user.full_name,
-                    "text": "liked your post",
-                    "link": f"/post/{post_id}",
-                    "sender_id": str(current_user.id),
-                    "sender_name": current_user.full_name,
-                })
-                await chat_manager.send_personal_message(payload, str(post_owner.id))
+            if hasattr(post_owner, "id") and str(post_owner.id) != user_id:
+                owner_id = str(post_owner.id)
+                caption_preview = post.caption[:40] + ("..." if len(post.caption) > 40 else "")
+                # In-app WS notification
+                await send_ws_notification(
+                    recipient_id=owner_id,
+                    notification_type="like",
+                    title=current_user.full_name,
+                    text="liked your post",
+                    link=f"/post/{post_id}",
+                    sender_id=user_id,
+                    sender_name=current_user.full_name,
+                )
+                # Push notification
+                asyncio.create_task(send_push_to_user(
+                    user_id=owner_id,
+                    title=f"{current_user.full_name} liked your post",
+                    body=caption_preview,
+                    url=f"/post/{post_id}",
+                ))
         except Exception:
             pass
 
@@ -318,27 +464,22 @@ async def toggle_save(
     return {"saved": saved, "saves_count": saves_count}
 
 
-# ── GET /posts/{post_id}/comments — fetch comments ───────────────────────────
+# ── GET /posts/{post_id}/comments ────────────────────────────────────────────
 @router.get("/{post_id}/comments", response_model=List[CommentResponse])
-async def get_comments(post_id: str):
+async def get_comments(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+):
     comments = await PostComment.find(
         PostComment.post_id == post_id
     ).sort(PostComment.created_at).to_list()
     return [
-        CommentResponse(
-            id=str(c.id),
-            post_id=c.post_id,
-            user_id=c.user_id,
-            user_name=c.user_name,
-            text=c.text,
-            parent_comment_id=c.parent_comment_id,
-            created_at=c.created_at.isoformat(),
-        )
+        await build_comment_response(c, str(current_user.id))
         for c in comments
     ]
 
 
-# ── POST /posts/{post_id}/comments — add a comment (or reply) ────────────────
+# ── POST /posts/{post_id}/comments — add comment or reply ────────────────────
 @router.post("/{post_id}/comments", response_model=CommentResponse)
 async def add_comment(
     post_id: str,
@@ -352,7 +493,6 @@ async def add_comment(
     if not comment_in.text.strip():
         raise HTTPException(status_code=400, detail="Comment cannot be empty")
 
-    # If this is a reply, verify the parent comment exists and belongs to this post
     if comment_in.parent_comment_id:
         parent = await PostComment.get(comment_in.parent_comment_id)
         if not parent or parent.post_id != post_id:
@@ -367,31 +507,139 @@ async def add_comment(
     )
     await comment.insert()
 
-    try:
+    actor_id = str(current_user.id)
+    actor_name = current_user.full_name
+    comment_preview = comment.text[:60] + ("..." if len(comment.text) > 60 else "")
+    comment_id = str(comment.id)
+
+    async def notify_comment():
         await post.fetch_link(Post.user)
         post_owner = post.user
-        if hasattr(post_owner, "id") and str(post_owner.id) != str(current_user.id):
-            from app.services.chat_manager import chat_manager
-            import json
-            payload = json.dumps({
-                "type": "notification",
-                "notification_type": "comment",
-                "title": current_user.full_name,
-                "text": f'commented: "{comment_in.text.strip()[:40]}"',
-                "link": f"/post/{post_id}",
-                "sender_id": str(current_user.id),
-                "sender_name": current_user.full_name,
-            })
-            await chat_manager.send_personal_message(payload, str(post_owner.id))
-    except Exception:
-        pass
 
-    return CommentResponse(
-        id=str(comment.id),
-        post_id=comment.post_id,
-        user_id=comment.user_id,
-        user_name=comment.user_name,
-        text=comment.text,
-        parent_comment_id=comment.parent_comment_id,
-        created_at=comment.created_at.isoformat(),
+        # ── Notify post owner about comment ──────────────────────────────
+        if hasattr(post_owner, "id") and str(post_owner.id) != actor_id:
+            owner_id = str(post_owner.id)
+            notif_text = (
+                f'replied to a comment: "{comment_preview}"'
+                if comment_in.parent_comment_id
+                else f'commented: "{comment_preview}"'
+            )
+            await asyncio.gather(
+                send_ws_notification(
+                    recipient_id=owner_id,
+                    notification_type="comment",
+                    title=actor_name,
+                    text=notif_text,
+                    link=f"/post/{post_id}",
+                    sender_id=actor_id,
+                    sender_name=actor_name,
+                ),
+                send_push_to_user(
+                    user_id=owner_id,
+                    title=f"{actor_name} commented on your post",
+                    body=comment_preview,
+                    url=f"/post/{post_id}",
+                ),
+            )
+
+        # ── If this is a reply, also notify the parent comment's author ──
+        if comment_in.parent_comment_id:
+            parent_comment = await PostComment.get(comment_in.parent_comment_id)
+            if (
+                parent_comment
+                and parent_comment.user_id != actor_id
+                and parent_comment.user_id != (str(post_owner.id) if hasattr(post_owner, "id") else "")
+            ):
+                await asyncio.gather(
+                    send_ws_notification(
+                        recipient_id=parent_comment.user_id,
+                        notification_type="reply",
+                        title=actor_name,
+                        text=f'replied to your comment: "{comment_preview}"',
+                        link=f"/post/{post_id}",
+                        sender_id=actor_id,
+                        sender_name=actor_name,
+                    ),
+                    send_push_to_user(
+                        user_id=parent_comment.user_id,
+                        title=f"{actor_name} replied to your comment",
+                        body=comment_preview,
+                        url=f"/post/{post_id}",
+                    ),
+                )
+
+        # ── Handle @mentions in comment text ─────────────────────────────
+        mentioned_usernames = extract_mentions(comment.text)
+        for username in set(mentioned_usernames):
+            mentioned_user = await User.find_one(User.username == username)
+            if mentioned_user and str(mentioned_user.id) != actor_id:
+                mentioned_id = str(mentioned_user.id)
+                await asyncio.gather(
+                    send_ws_notification(
+                        recipient_id=mentioned_id,
+                        notification_type="mention",
+                        title=actor_name,
+                        text=f"mentioned you in a comment",
+                        link=f"/post/{post_id}",
+                        sender_id=actor_id,
+                        sender_name=actor_name,
+                    ),
+                    send_push_to_user(
+                        user_id=mentioned_id,
+                        title=f"{actor_name} mentioned you",
+                        body=comment_preview,
+                        url=f"/post/{post_id}",
+                    ),
+                )
+
+    asyncio.create_task(notify_comment())
+
+    return await build_comment_response(comment, actor_id)
+
+
+# ── POST /posts/comments/{comment_id}/like — toggle comment like ──────────────
+@router.post("/comments/{comment_id}/like")
+async def toggle_comment_like(
+    comment_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    comment = await PostComment.get(comment_id)
+    if not comment:
+        raise HTTPException(status_code=404, detail="Comment not found")
+
+    user_id = str(current_user.id)
+    existing = await CommentLike.find_one(
+        CommentLike.comment_id == comment_id,
+        CommentLike.user_id == user_id
     )
+    if existing:
+        await existing.delete()
+        liked = False
+    else:
+        await CommentLike(comment_id=comment_id, user_id=user_id).insert()
+        liked = True
+
+        # Notify comment author
+        if comment.user_id != user_id:
+            asyncio.create_task(asyncio.gather(
+                send_ws_notification(
+                    recipient_id=comment.user_id,
+                    notification_type="like",
+                    title=current_user.full_name,
+                    text="liked your comment",
+                    link=f"/post/{comment.post_id}",
+                    sender_id=user_id,
+                    sender_name=current_user.full_name,
+                ),
+                send_push_to_user(
+                    user_id=comment.user_id,
+                    title=f"{current_user.full_name} liked your comment",
+                    body=comment.text[:60],
+                    url=f"/post/{comment.post_id}",
+                ),
+            ))
+
+    likes_count = await CommentLike.find(
+        CommentLike.comment_id == comment_id
+    ).count()
+    return {"liked": liked, "likes_count": likes_count}

@@ -213,6 +213,8 @@ export interface ApiComment {
   text: string;
   parent_comment_id?: string | null;
   created_at: string;
+  likes_count: number;
+  is_liked: boolean;
 }
 
 export const getComments = async (postId: string): Promise<ApiComment[]> => {
@@ -621,5 +623,25 @@ export const reviewApplication = async (
     decision,
     rejection_reason: rejectionReason,
   });
+  return response.data;
+};
+
+// ── Comment Likes ─────────────────────────────────────────────────────────────
+
+export const toggleCommentLike = async (
+  commentId: string
+): Promise<{ liked: boolean; likes_count: number }> => {
+  const response = await apiClient.post(`/posts/comments/${commentId}/like`);
+  return response.data;
+};
+
+// ── @Mention user search ──────────────────────────────────────────────────────
+
+export const getMentionSuggestions = async (
+  query: string
+): Promise<ApiUser[]> => {
+  const response = await apiClient.get(
+    `/auth/users/search?q=${encodeURIComponent(query)}`
+  );
   return response.data;
 };
