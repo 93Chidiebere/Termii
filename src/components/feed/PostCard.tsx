@@ -158,9 +158,10 @@ const CommentRow = ({
     setLikeCount((c) => newLiked ? c + 1 : c - 1);
     try {
       const result = await toggleCommentLike(comment.id);
-      setLiked(result.liked);
+      // Only sync the server count — don't overwrite liked state
       setLikeCount(result.likes_count);
     } catch {
+      // Revert on actual failure
       setLiked(!newLiked);
       setLikeCount((c) => newLiked ? c - 1 : c + 1);
     }
@@ -315,9 +316,11 @@ export const PostCard = ({ post, index }: PostCardProps) => {
     setLikeCount((c) => newLiked ? c + 1 : c - 1);
     try {
       const result = await toggleLike(post.id);
-      setLiked(result.liked);
+      // Only sync the server count — don't overwrite liked state
+      // The optimistic toggle is already correct
       setLikeCount(result.likes_count);
     } catch {
+      // Revert on actual failure
       setLiked(!newLiked);
       setLikeCount((c) => newLiked ? c - 1 : c + 1);
     }
