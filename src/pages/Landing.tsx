@@ -154,7 +154,7 @@ const Landing = () => {
             <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
-            <p className="text-xs text-muted-foreground">© 2026 Isi Ngala . All rights reserved.</p>
+            <p className="text-xs text-muted-foreground">© 2026 Isi Ngala by UNICCO . All rights reserved.</p>
           </div>
         </div>
       </footer>
