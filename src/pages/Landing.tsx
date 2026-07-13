@@ -151,10 +151,10 @@ const Landing = () => {
             <span className="text-xs text-muted-foreground ml-2">Your Hair is Your Pride</span>
           </div>
           <div className="flex items-center gap-4">
-            <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
-              Blog
-            </Link>
-            <p className="text-xs text-muted-foreground">© 2026 Isi Ngala by UNICCO . All rights reserved.</p>
+            <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
+            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
+            <p className="text-xs text-muted-foreground">© 2026 Isi Ngala by UNICCO. All rights reserved.</p>
           </div>
         </div>
       </footer>
