@@ -14,6 +14,7 @@ import { useGlobalSocket } from "@/hooks/useGlobalSocket";
 import { getMe } from "@/lib/api";
 import { useRoleStore } from "@/stores/roleStore";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 
 
 const Landing = lazy(() => import("./pages/Landing"));
@@ -105,6 +106,7 @@ const App = () => {
             </Routes>
           </Suspense>
         </BrowserRouter>
+        <PwaInstallPrompt />
       </TooltipProvider>
     </QueryClientProvider>
   );
