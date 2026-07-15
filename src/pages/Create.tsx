@@ -1,11 +1,13 @@
 import { useState } from "react";
-import { Camera, Video, X, Loader2 } from "lucide-react";
+import { Camera, Video, X, Loader2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { toast } from "sonner";
-import { createPost } from "@/lib/api";
+import { createPost, getPresignedUploadUrl } from "@/lib/api";
 import imageCompression from "browser-image-compression";
+import { VideoRecorder } from "@/components/VideoRecorder";
+import axios from "axios";
 
 const CLOUDINARY_CLOUD = "dwfojbv0m";
 const CLOUDINARY_PRESET = "jxuvhapr";
@@ -16,6 +18,30 @@ const MAX_IMAGE_SIZE_MB = 15;
 
 const MAX_VIDEO_SIZE_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
 const MAX_IMAGE_SIZE_BYTES = MAX_IMAGE_SIZE_MB * 1024 * 1024;
+
+const uploadToB2 = async (
+  file: File,
+  onProgress?: (pct: number) => void
+): Promise<string> => {
+  const presignData = await getPresignedUploadUrl(file.name, file.type);
+  const formData = new FormData();
+  
+  Object.entries(presignData.fields).forEach(([key, value]) => {
+    formData.append(key, value);
+  });
+  formData.append("file", file);
+
+  await axios.post(presignData.url, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total && onProgress) {
+        onProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
+      }
+    },
+  });
+
+  return presignData.media_url;
+};
 
 const uploadToCloudinary = async (
   file: File,
@@ -65,6 +91,14 @@ const Create = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatus, setUploadStatus] = useState("");
+  const [isVideoRecorderOpen, setIsVideoRecorderOpen] = useState(false);
+
+  const handleVideoRecorded = (file: File) => {
+    setMediaFile(file);
+    setMediaType("video");
+    const objectUrl = URL.createObjectURL(file);
+    setMediaPreview(objectUrl);
+  };
 
   const handleMediaUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -133,12 +167,17 @@ const Create = () => {
           }
         }
 
-        setUploadStatus(
-          mediaType === "video" ? "Uploading video..." : "Uploading image..."
-        );
-        mediaUrl = await uploadToCloudinary(fileToUpload, mediaType, (pct) => {
-          setUploadProgress(pct);
-        });
+        if (mediaType === "video") {
+          setUploadStatus("Uploading video to Backblaze...");
+          mediaUrl = await uploadToB2(fileToUpload, (pct) => {
+            setUploadProgress(pct);
+          });
+        } else {
+          setUploadStatus("Uploading image...");
+          mediaUrl = await uploadToCloudinary(fileToUpload, mediaType, (pct) => {
+            setUploadProgress(pct);
+          });
+        }
         setUploadStatus("Saving post...");
       }
 
@@ -220,28 +259,39 @@ const Create = () => {
               )}
             </div>
           ) : (
-            <label className="aspect-video rounded-2xl border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
-              <input
-                type="file"
-                accept="image/*,video/*"
-                className="hidden"
-                onChange={handleMediaUpload}
-              />
-              <div className="flex items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-                  <Camera size={26} className="text-muted-foreground" />
+            <div className="space-y-3">
+              <label className="aspect-video rounded-2xl border-2 border-dashed border-border bg-card flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/40 transition-colors">
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  className="hidden"
+                  onChange={handleMediaUpload}
+                />
+                <div className="flex items-center gap-3">
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                    <Camera size={26} className="text-muted-foreground" />
+                  </div>
+                  <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                    <Video size={26} className="text-muted-foreground" />
+                  </div>
                 </div>
-                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-                  <Video size={26} className="text-muted-foreground" />
+                <div className="text-center px-4">
+                  <p className="text-sm font-semibold text-foreground">Choose from library</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Images up to {MAX_IMAGE_SIZE_MB}MB · Videos up to {MAX_VIDEO_SIZE_MB}MB
+                  </p>
                 </div>
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-semibold text-foreground">Add a photo or video</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Images up to {MAX_IMAGE_SIZE_MB}MB · Videos up to {MAX_VIDEO_SIZE_MB}MB
-                </p>
-              </div>
-            </label>
+              </label>
+
+              <button
+                type="button"
+                onClick={() => setIsVideoRecorderOpen(true)}
+                className="w-full py-3.5 border border-primary/30 rounded-2xl bg-primary/5 text-primary hover:bg-primary/10 transition-colors text-sm font-bold flex items-center justify-center gap-2"
+              >
+                <Sparkles size={16} className="animate-pulse" />
+                Record Short Video with Beauty Filter
+              </button>
+            </div>
           )}
 
           {/* Upload progress bar */}
@@ -316,6 +366,11 @@ const Create = () => {
           </button>
         </motion.div>
       </div>
+      <VideoRecorder
+        isOpen={isVideoRecorderOpen}
+        onClose={() => setIsVideoRecorderOpen(false)}
+        onSave={handleVideoRecorded}
+      />
     </AppLayout>
   );
 };

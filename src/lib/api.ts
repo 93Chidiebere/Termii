@@ -660,3 +660,22 @@ export const resetPassword = async (token: string, newPassword: string): Promise
   });
   return response.data;
 };
+
+// ── S3 Presign Upload ─────────────────────────────────────────────────────────
+
+export interface PresignedPostResponse {
+  url: string;
+  fields: Record<string, string>;
+  media_url: string;
+}
+
+export const getPresignedUploadUrl = async (
+  filename: string,
+  fileType: string
+): Promise<PresignedPostResponse> => {
+  const response = await apiClient.post("/posts/presign", {
+    filename,
+    file_type: fileType,
+  });
+  return response.data;
+};

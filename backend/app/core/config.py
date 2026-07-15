@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: str = "your_aws_secret_key"
     AWS_REGION: str = "af-south-1"
     S3_BUCKET_NAME: str = "your_s3_bucket_name"
+    S3_ENDPOINT_URL: str = "https://s3.us-east-005.backblazeb2.com"
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
