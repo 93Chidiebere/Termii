@@ -154,3 +154,46 @@ async def update_me(
 
     await current_user.save()
     return UserResponse.from_mongo(current_user)
+
+
+# ── Password Reset Endpoints ──────────────────────────────────────────────────
+import secrets
+from datetime import datetime, timedelta
+from app.services.email import send_reset_email
+
+class ForgotPasswordRequest(BM):
+    email: str
+
+class ResetPasswordRequest(BM):
+    token: str
+    new_password: str
+
+@router.post("/forgot-password")
+async def forgot_password(req: ForgotPasswordRequest):
+    user = await User.find_one(User.email == req.email)
+    if user:
+        token = secrets.token_urlsafe(32)
+        user.reset_token = token
+        user.reset_token_expires_at = datetime.utcnow() + timedelta(hours=1)
+        await user.save()
+
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        send_reset_email(user.email, reset_link)
+
+    return {"message": "If the email is registered, a password reset link has been sent."}
+
+@router.post("/reset-password")
+async def reset_password(req: ResetPasswordRequest):
+    user = await User.find_one(
+        User.reset_token == req.token,
+        User.reset_token_expires_at > datetime.utcnow()
+    )
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
+
+    user.hashed_password = get_password_hash(req.new_password)
+    user.reset_token = None
+    user.reset_token_expires_at = None
+    await user.save()
+
+    return {"message": "Password has been reset successfully."}

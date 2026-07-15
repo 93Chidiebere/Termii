@@ -45,5 +45,9 @@ class User(Document):
     suspension_reason: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
+    # ── Password Reset Fields ─────────────────────────────────────────────────
+    reset_token: Optional[str] = None
+    reset_token_expires_at: Optional[datetime] = None
+
     class Settings:
         name = "users"

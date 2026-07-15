@@ -20,7 +20,16 @@ class Settings(BaseSettings):
     VAPID_PRIVATE_KEY: str = "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgepKce7Aqk-TjbsQJ6EGprdn7NmCU2c2g3OmLtzI5fu6hRANCAAR12Lkop6LdRBHSB2zvkq2wCweHvIjfThKeRx35t-MR7pcXL3I4UDETu20RjAaV-TtrlpAB-r4T2EjQ0iUsDwHk"
     VAPID_EMAIL: str = "mailto:vchidiebere.vc@gmail.com"
 
+    FRONTEND_URL: str = "https://isingala.com"
+
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_SENDER: str = "noreply@isingala.com"
+
     class Config:
         env_file = ".env"
+        extra = "ignore"
 
 settings = Settings()

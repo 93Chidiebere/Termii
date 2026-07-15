@@ -1,19 +1,24 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, CheckCircle, Lock } from "lucide-react";
+import { Eye, EyeOff, CheckCircle, Lock, Loader2 } from "lucide-react";
 import { PasswordStrength, getPasswordStrength } from "@/components/auth/PasswordStrength";
+import { resetPassword } from "@/lib/api";
 
 const ResetPassword = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -26,8 +31,23 @@ const ResetPassword = () => {
       setError("Passwords don't match.");
       return;
     }
+    if (!token) {
+      setError("Reset token is missing from the link URL.");
+      return;
+    }
 
-    setSuccess(true);
+    setLoading(true);
+    try {
+      await resetPassword(token, password);
+      setSuccess(true);
+    } catch (err: any) {
+      setError(
+        err.response?.data?.detail || 
+        "Failed to reset password. The link may have expired or is invalid."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (success) {
@@ -76,6 +96,7 @@ const ResetPassword = () => {
                 <input
                   type={showPassword ? "text" : "password"}
                   required
+                  disabled={loading}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -95,6 +116,7 @@ const ResetPassword = () => {
                 <input
                   type={showConfirm ? "text" : "password"}
                   required
+                  disabled={loading}
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -110,13 +132,25 @@ const ResetPassword = () => {
               )}
             </div>
 
-            {error && <p className="text-sm text-destructive text-center">{error}</p>}
+            {error && (
+              <p className="text-xs text-destructive text-center font-medium bg-destructive/10 py-2 rounded-lg">
+                {error}
+              </p>
+            )}
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-70"
             >
-              Reset Password
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Resetting...
+                </>
+              ) : (
+                "Reset Password"
+              )}
             </button>
           </form>
         </div>
