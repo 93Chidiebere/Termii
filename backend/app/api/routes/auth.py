@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from jose import jwt, JWTError
 from typing import List, Optional as Opt
@@ -169,7 +169,7 @@ class ResetPasswordRequest(BM):
     new_password: str
 
 @router.post("/forgot-password")
-async def forgot_password(req: ForgotPasswordRequest):
+async def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks):
     user = await User.find_one(User.email == req.email)
     if user:
         token = secrets.token_urlsafe(32)
@@ -178,7 +178,7 @@ async def forgot_password(req: ForgotPasswordRequest):
         await user.save()
 
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-        send_reset_email(user.email, reset_link)
+        background_tasks.add_task(send_reset_email, user.email, reset_link)
 
     return {"message": "If the email is registered, a password reset link has been sent."}
 

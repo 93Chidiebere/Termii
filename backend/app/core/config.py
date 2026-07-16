@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     AWS_REGION: str = "af-south-1"
     S3_BUCKET_NAME: str = "your_s3_bucket_name"
     S3_ENDPOINT_URL: str = "https://s3.us-east-005.backblazeb2.com"
+    BREVO_API_KEY: str = ""
 
     GOOGLE_CLIENT_ID: str = ""
     GOOGLE_CLIENT_SECRET: str = ""
