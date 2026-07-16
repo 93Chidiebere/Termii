@@ -37,7 +37,7 @@ const ForgotPassword = () => {
         className="w-full max-w-md"
       >
         <div className="text-center mb-8">
-          <h1 className="font-display text-4xl font-bold text-foreground mb-2">Termii Africa</h1>
+          <h1 className="font-display text-4xl font-bold text-foreground mb-2">Isi Ngala</h1>
           <p className="text-sm text-muted-foreground tracking-wider uppercase">Your Hair is Your Pride</p>
         </div>
 
