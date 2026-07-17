@@ -1,5 +1,5 @@
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
-import { Home, Search, PlusSquare, Bell, User, MessageCircle, Shield, Users, ShoppingBag, LogOut } from "lucide-react";
+import { Home, Search, PlusSquare, Bell, User, MessageCircle, Shield, Users, ShoppingBag, LogOut, Sparkles } from "lucide-react";
 import { useAuthStore } from "@/stores/authStore";
 import { useRoleStore } from "@/stores/roleStore";
 import { useNotificationStore } from "@/stores/notificationStore";
@@ -8,6 +8,7 @@ import { useMessageStore } from "@/stores/messageStore";
 const navItems = [
   { to: "/feed", icon: Home, label: "Home" },
   { to: "/explore", icon: Search, label: "Explore" },
+  { to: "/try-on", icon: Sparkles, label: "Try Hairstyles" },
   { to: "/create", icon: PlusSquare, label: "Create" },
   { to: "/activity", icon: Bell, label: "Notifications" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },

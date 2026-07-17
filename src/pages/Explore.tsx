@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Search, ArrowLeft, Loader2 } from "lucide-react";
+import { Search, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AppLayout } from "@/components/layout/AppLayout";
 const trendingTags = [
@@ -110,6 +110,27 @@ const Explore = () => {
             className="w-full pl-10 pr-4 py-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
         </div>
+
+        {/* Try-On Banner */}
+        {!activeTag && !search && (
+          <Link
+            to="/try-on"
+            className="block relative overflow-hidden rounded-2xl bg-gradient-to-r from-warm-brown to-[#a0522d] text-white p-5 mb-8 hover:opacity-95 transition-opacity shadow-md group"
+          >
+            <div className="relative z-10 max-w-[70%]">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 border border-primary/30 text-gold text-[10px] font-bold uppercase tracking-wider mb-2">
+                <Sparkles size={10} className="animate-pulse" /> Try it now
+              </span>
+              <h2 className="font-display text-lg font-bold">Virtual Hairstyle Try-On</h2>
+              <p className="text-xs text-white/80 mt-1 leading-relaxed">
+                See how Afros, Braids, and Locs look on your face using your camera before visiting the salon!
+              </p>
+            </div>
+            <div className="absolute right-4 bottom-0 top-0 w-1/5 flex items-center justify-center opacity-30 group-hover:scale-105 transition-transform duration-300">
+              <Sparkles size={64} className="text-gold" />
+            </div>
+          </Link>
+        )}
 
         {/* Trending tags + categories — only when no tag active */}
         {!activeTag && !search && (
