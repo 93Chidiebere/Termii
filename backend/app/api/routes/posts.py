@@ -135,6 +135,67 @@ async def build_post_response(post: Post, user: User, current_user_id: str) -> P
     )
 
 
+async def build_posts_responses_batch(
+    posts: List[Post], current_user_id: Optional[str] = None
+) -> List[PostResponse]:
+    if not posts:
+        return []
+
+    post_ids = [str(p.id) for p in posts]
+
+    all_likes = await PostLike.find({"post_id": {"$in": post_ids}}).to_list()
+    all_saves = await PostSave.find({"post_id": {"$in": post_ids}}).to_list()
+    all_comments = await PostComment.find({"post_id": {"$in": post_ids}}).to_list()
+
+    from collections import defaultdict
+    likes_count_map = defaultdict(int)
+    saves_count_map = defaultdict(int)
+    comments_count_map = defaultdict(int)
+
+    user_liked_posts = set()
+    user_saved_posts = set()
+
+    for like in all_likes:
+        likes_count_map[like.post_id] += 1
+        if current_user_id and like.user_id == current_user_id:
+            user_liked_posts.add(like.post_id)
+
+    for save in all_saves:
+        saves_count_map[save.post_id] += 1
+        if current_user_id and save.user_id == current_user_id:
+            user_saved_posts.add(save.post_id)
+
+    for comment in all_comments:
+        comments_count_map[comment.post_id] += 1
+
+    result = []
+    for post in posts:
+        post_id = str(post.id)
+        user = post.user
+        if not user or not hasattr(user, "id"):
+            continue
+
+        result.append(
+            PostResponse(
+                id=post_id,
+                caption=post.caption,
+                hair_type=post.hair_type,
+                tags=post.hashtags,
+                media_url=post.media_url,
+                media_type=post.type.lower() if post.type != "TEXT" else None,
+                user_id=str(user.id),
+                user_name=user.full_name or "Unknown",
+                created_at=post.created_at.isoformat(),
+                likes_count=likes_count_map[post_id],
+                saves_count=saves_count_map[post_id],
+                comments_count=comments_count_map[post_id],
+                is_liked=post_id in user_liked_posts,
+                is_saved=post_id in user_saved_posts,
+            )
+        )
+    return result
+
+
 async def build_comment_response(
     comment: PostComment,
     current_user_id: str
@@ -362,27 +423,19 @@ async def create_post(
 
 # ── GET /posts/ — fetch all posts (feed) ─────────────────────────────────────
 @router.get("/", response_model=List[PostResponse])
-async def get_posts():
-    posts = await Post.find_all().sort(-Post.created_at).to_list()
-    result = []
-    for post in posts:
-        await post.fetch_link(Post.user)
-        user = post.user
-        if hasattr(user, "id"):
-            result.append(await build_post_response(post, user, ""))
-    return result
+async def get_posts(current_user: User = Depends(get_current_user)):
+    posts = await Post.find_all(fetch_links=True).sort(-Post.created_at).to_list()
+    return await build_posts_responses_batch(posts, str(current_user.id))
 
 
 # ── GET /posts/my ─────────────────────────────────────────────────────────────
 @router.get("/my", response_model=List[PostResponse])
 async def get_my_posts(current_user: User = Depends(get_current_user)):
     posts = await Post.find(
-        Post.user.id == current_user.id  # type: ignore
+        Post.user.id == current_user.id,  # type: ignore
+        fetch_links=True
     ).sort(-Post.created_at).to_list()
-    result = []
-    for post in posts:
-        result.append(await build_post_response(post, current_user, str(current_user.id)))
-    return result
+    return await build_posts_responses_batch(posts, str(current_user.id))
 
 
 # ── GET /posts/saved ──────────────────────────────────────────────────────────
@@ -391,15 +444,24 @@ async def get_saved_posts(current_user: User = Depends(get_current_user)):
     saves = await PostSave.find(
         PostSave.user_id == str(current_user.id)
     ).to_list()
-    result = []
-    for save in saves:
-        post = await Post.get(save.post_id)
-        if post:
-            await post.fetch_link(Post.user)
-            user = post.user
-            if hasattr(user, "id"):
-                result.append(await build_post_response(post, user, str(current_user.id)))
-    return result
+    if not saves:
+        return []
+        
+    from beanie import PydanticObjectId
+    post_ids = [s.post_id for s in saves]
+    object_ids = []
+    for pid in post_ids:
+        try:
+            object_ids.append(PydanticObjectId(pid))
+        except Exception:
+            pass
+
+    posts = await Post.find(
+        {"_id": {"$in": object_ids}},
+        fetch_links=True
+    ).to_list()
+    
+    return await build_posts_responses_batch(posts, str(current_user.id))
 
 
 # ── GET /posts/{post_id} ──────────────────────────────────────────────────────

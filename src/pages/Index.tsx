@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { Post } from "@/types";
 import { PostCard } from "@/components/feed/PostCard";
 import { AppLayout } from "@/components/layout/AppLayout";
@@ -9,34 +9,12 @@ import { FloatingCreateButton } from "@/components/feed/FloatingCreateButton";
 
 const Index = () => {
   const { isMuted, isBlocked } = useBlockMuteStore();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
 
-  const fetchPosts = useCallback(async () => {
-    try {
-      const data = await getPosts();
-      setPosts(data);
-      setError(null);
-    } catch {
-      setError("Could not load posts from server.");
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    setIsLoading(true);
-    fetchPosts();
-  }, [fetchPosts]);
-
-  useEffect(() => {
-    const handleVisibility = () => {
-      if (document.visibilityState === "visible") fetchPosts();
-    };
-    document.addEventListener("visibilitychange", handleVisibility);
-    return () => document.removeEventListener("visibilitychange", handleVisibility);
-  }, [fetchPosts]);
+  const { data: posts = [], isLoading, error } = useQuery<Post[]>({
+    queryKey: ["posts"],
+    queryFn: getPosts,
+    refetchOnWindowFocus: true,
+  });
 
   const visiblePosts = posts.filter(
     (p) => !isMuted(p.userId) && !isBlocked(p.userId)
@@ -60,7 +38,7 @@ const Index = () => {
 
         {!isLoading && error && (
           <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-700 text-sm text-center">
-            {error}
+            Could not load posts from server.
           </div>
         )}
 
