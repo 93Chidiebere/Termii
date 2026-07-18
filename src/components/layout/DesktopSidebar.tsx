@@ -8,7 +8,6 @@ import { useMessageStore } from "@/stores/messageStore";
 const navItems = [
   { to: "/feed", icon: Home, label: "Home" },
   { to: "/explore", icon: Search, label: "Explore" },
-  { to: "/try-on", icon: Sparkles, label: "Try Hairstyles" },
   { to: "/create", icon: PlusSquare, label: "Create" },
   { to: "/activity", icon: Bell, label: "Notifications" },
   { to: "/messages", icon: MessageCircle, label: "Messages" },

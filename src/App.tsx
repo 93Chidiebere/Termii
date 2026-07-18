@@ -38,7 +38,6 @@ const OrderCallback = lazy(() => import("./pages/OrderCallback"));
 const Orders = lazy(() => import("./pages/Orders"));
 const Blog = lazy(() => import("./pages/Blog"));
 const BlogPostDetail = lazy(() => import("./pages/BlogPostDetail"));
-const TryOn = lazy(() => import("./pages/TryOn"));
 const SellerApplicationCallback = lazy(() => import("./pages/SellerApplicationCallback"));
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/TermsOfService"));
@@ -85,8 +84,7 @@ const App = () => {
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/feed" element={<ProtectedRoute><Index /></ProtectedRoute>} />
-              <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-              <Route path="/try-on" element={<ProtectedRoute><TryOn /></ProtectedRoute>} />
+              <Route path="/explore" element={<Explore />} />
               <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
               <Route path="/post/:id" element={<ProtectedRoute><PostDetail /></ProtectedRoute>} />
               <Route path="/activity" element={<ProtectedRoute><Activity /></ProtectedRoute>} />

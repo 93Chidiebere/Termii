@@ -428,6 +428,15 @@ async def get_posts(current_user: User = Depends(get_current_user)):
     return await build_posts_responses_batch(posts, str(current_user.id))
 
 
+# ── GET /posts/explore — fetch top posts for unauthenticated users ───────────
+@router.get("/explore", response_model=List[PostResponse])
+async def get_explore_posts():
+    posts = await Post.find_all(fetch_links=True).to_list()
+    responses = await build_posts_responses_batch(posts, None)
+    responses.sort(key=lambda x: x.likes_count, reverse=True)
+    return responses[:10]
+
+
 # ── GET /posts/my ─────────────────────────────────────────────────────────────
 @router.get("/my", response_model=List[PostResponse])
 async def get_my_posts(current_user: User = Depends(get_current_user)):

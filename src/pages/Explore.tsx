@@ -19,11 +19,13 @@ const hairCategories = [
   { name: "Silk Press" },
   { name: "Bantu Knots" },
 ];
-import { getPosts } from "@/lib/api";
+import { getPosts, getExplorePosts } from "@/lib/api";
 import type { Post } from "@/types";
 import { FloatingCreateButton } from "@/components/feed/FloatingCreateButton";
+import { useAuthStore } from "@/stores/authStore";
 
 const Explore = () => {
+  const { isAuthenticated } = useAuthStore();
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [allPosts, setAllPosts] = useState<Post[]>([]);
@@ -33,7 +35,7 @@ const Explore = () => {
     const load = async () => {
       setIsLoading(true);
       try {
-        const data = await getPosts();
+        const data = isAuthenticated ? await getPosts() : await getExplorePosts();
         setAllPosts(data);
       } catch {
         // silently fail — empty state shown
@@ -42,7 +44,7 @@ const Explore = () => {
       }
     };
     load();
-  }, []);
+  }, [isAuthenticated]);
 
   const handleTagClick = (tag: string) => {
     setActiveTag(activeTag === tag ? null : tag);
@@ -100,40 +102,21 @@ const Explore = () => {
         </div>
 
         {/* Search */}
-        <div className="relative mb-6">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search styles, hair types, techniques..."
-            className="w-full pl-10 pr-4 py-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-          />
-        </div>
-
-        {/* Try-On Banner */}
-        {!activeTag && !search && (
-          <Link
-            to="/try-on"
-            className="block relative overflow-hidden rounded-2xl bg-gradient-to-r from-warm-brown to-[#a0522d] text-white p-5 mb-8 hover:opacity-95 transition-opacity shadow-md group"
-          >
-            <div className="relative z-10 max-w-[70%]">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 border border-primary/30 text-gold text-[10px] font-bold uppercase tracking-wider mb-2">
-                <Sparkles size={10} className="animate-pulse" /> Try it now
-              </span>
-              <h2 className="font-display text-lg font-bold">Virtual Hairstyle Try-On</h2>
-              <p className="text-xs text-white/80 mt-1 leading-relaxed">
-                See how Afros, Braids, and Locs look on your face using your camera before visiting the salon!
-              </p>
-            </div>
-            <div className="absolute right-4 bottom-0 top-0 w-1/5 flex items-center justify-center opacity-30 group-hover:scale-105 transition-transform duration-300">
-              <Sparkles size={64} className="text-gold" />
-            </div>
-          </Link>
+        {isAuthenticated && (
+          <div className="relative mb-6">
+            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search styles, hair types, techniques..."
+              className="w-full pl-10 pr-4 py-3 rounded-xl bg-card border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
         )}
 
         {/* Trending tags + categories — only when no tag active */}
-        {!activeTag && !search && (
+        {isAuthenticated && !activeTag && !search && (
           <>
             <div className="mb-8">
               <h2 className="font-display text-lg font-semibold text-foreground mb-3">Trending</h2>
@@ -169,7 +152,7 @@ const Explore = () => {
         {/* Posts grid */}
         <div>
           <h2 className="font-display text-lg font-semibold text-foreground mb-3">
-            {activeTag ? `Posts tagged #${activeTag}` : search ? "Search Results" : "Discover"}
+            {!isAuthenticated ? "Top Posts" : activeTag ? `Posts tagged #${activeTag}` : search ? "Search Results" : "Discover"}
           </h2>
 
           {isLoading ? (
@@ -226,8 +209,23 @@ const Explore = () => {
             </div>
           )}
         </div>
+        {/* Unauthenticated CTA */}
+        {!isAuthenticated && (
+          <div className="mt-12 mb-8 text-center bg-card border border-border p-8 rounded-2xl">
+            <h3 className="font-display text-2xl font-bold text-foreground mb-3">Discover the full experience</h3>
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
+              Sign up to like, comment, search by tags, and connect with a community that celebrates your natural hair.
+            </p>
+            <Link
+              to="/login?signup=true"
+              className="inline-block px-8 py-3 rounded-full bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+            >
+              Create Account to Continue
+            </Link>
+          </div>
+        )}
       </div>
-      <FloatingCreateButton />
+      {isAuthenticated && <FloatingCreateButton />}
     </AppLayout>
   );
 };

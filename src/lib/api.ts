@@ -179,6 +179,11 @@ export const getPosts = async (): Promise<Post[]> => {
   return (response.data as ApiPost[]).map(transformPost);
 };
 
+export const getExplorePosts = async (): Promise<Post[]> => {
+  const response = await apiClient.get("/posts/explore");
+  return (response.data as ApiPost[]).map(transformPost);
+};
+
 export const getMyPosts = async (): Promise<Post[]> => {
   const response = await apiClient.get("/posts/my");
   return (response.data as ApiPost[]).map(transformPost);
