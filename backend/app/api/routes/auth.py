@@ -183,6 +183,11 @@ async def forgot_password(req: ForgotPasswordRequest, background_tasks: Backgrou
         await user.save()
 
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
+        print(f"\n=======================================================", flush=True)
+        print(f"MANUAL LINK FOR {clean_email}:", flush=True)
+        print(f"{reset_link}", flush=True)
+        print(f"=======================================================\n", flush=True)
+        
         background_tasks.add_task(send_reset_email, user.email, reset_link)
     else:
         print(f"[DEBUG] User NOT found in database for email: '{clean_email}'", flush=True)
