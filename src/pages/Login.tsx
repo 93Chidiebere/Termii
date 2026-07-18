@@ -325,6 +325,12 @@ const Login = () => {
           )}
         </div>
 
+        <div className="mt-8 text-center text-xs text-muted-foreground space-y-1 bg-card/50 py-3 rounded-xl border border-border">
+          <p className="font-semibold text-foreground mb-1">Need Help or Have Enquiries?</p>
+          <p>Email: <a href="mailto:vchidiebere.vc@gmail.com" className="hover:text-primary transition-colors">vchidiebere.vc@gmail.com</a></p>
+          <p>WhatsApp: <a href="https://wa.me/2347068488419" className="hover:text-primary transition-colors">07068488419</a></p>
+        </div>
+
         <p className="text-center text-xs text-muted-foreground mt-6">
           <Link to="/" className="hover:underline">← Back to home</Link>
         </p>

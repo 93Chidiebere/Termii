@@ -88,6 +88,14 @@ export const DesktopSidebar = () => {
         )}
       </nav>
 
+      <div className="px-6 pb-4">
+        <p className="text-[10px] text-sidebar-foreground/50 uppercase tracking-wider font-semibold mb-2">Support & Enquiries</p>
+        <div className="text-xs text-sidebar-foreground/70 space-y-1">
+          <p>Email: <a href="mailto:vchidiebere.vc@gmail.com" className="hover:text-gold transition-colors">vchidiebere.vc@gmail.com</a></p>
+          <p>WhatsApp: <a href="https://wa.me/2347068488419" className="hover:text-gold transition-colors">07068488419</a></p>
+        </div>
+      </div>
+
       <div className="p-4 border-t border-sidebar-border">
         {isAuthenticated ? (
           <div className="flex items-center gap-3">

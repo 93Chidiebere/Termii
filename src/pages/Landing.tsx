@@ -150,12 +150,20 @@ const Landing = () => {
             <span className="font-display text-lg font-bold text-foreground">Isi Ngala</span>
             <span className="text-xs text-muted-foreground ml-2">Your Hair is Your Pride</span>
           </div>
-          <div className="flex items-center gap-4">
-            <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
-            <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
-            <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
-            <p className="text-xs text-muted-foreground">© 2026 Isi Ngala by UNICCO. All rights reserved.</p>
-          </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-4 sm:mt-0">
+              <div className="flex items-center gap-4">
+                <Link to="/blog" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Blog</Link>
+                <Link to="/privacy" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Privacy Policy</Link>
+                <Link to="/terms" className="text-xs text-muted-foreground hover:text-foreground transition-colors">Terms of Service</Link>
+              </div>
+              <div className="hidden sm:block w-px h-4 bg-border"></div>
+              <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                <span>Enquiries: <a href="mailto:vchidiebere.vc@gmail.com" className="hover:text-foreground transition-colors">vchidiebere.vc@gmail.com</a></span>
+                <span>WhatsApp: <a href="https://wa.me/2347068488419" className="hover:text-foreground transition-colors">07068488419</a></span>
+              </div>
+              <div className="hidden sm:block w-px h-4 bg-border"></div>
+              <p className="text-xs text-muted-foreground">© 2026 Isi Ngala by UNICCO. All rights reserved.</p>
+            </div>
         </div>
       </footer>
     </div>
