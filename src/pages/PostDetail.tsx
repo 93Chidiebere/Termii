@@ -9,11 +9,13 @@ import { AppLayout } from "@/components/layout/AppLayout";
 import { useFollowStore } from "@/stores/followStore";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/stores/authStore";
 import { useNotificationStore } from "@/stores/notificationStore";
 import {
   getPostById, toggleLike, toggleSave,
-  getComments, addComment, type ApiComment,
+  getComments, addComment, getPostLikes,
+  type ApiComment, type ApiUser,
 } from "@/lib/api";
 import type { Post } from "@/types";
 import { formatDistanceToNow } from "date-fns";
@@ -48,6 +50,23 @@ const PostDetail = () => {
   const [isLoadingComments, setIsLoadingComments] = useState(false);
   const [comment, setComment] = useState("");
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [isLikesModalOpen, setIsLikesModalOpen] = useState(false);
+  const [likesUsers, setLikesUsers] = useState<ApiUser[]>([]);
+  const [isLoadingLikes, setIsLoadingLikes] = useState(false);
+
+  const fetchLikes = async () => {
+    if (!post) return;
+    setIsLoadingLikes(true);
+    setIsLikesModalOpen(true);
+    try {
+      const users = await getPostLikes(post.id);
+      setLikesUsers(users);
+    } catch {
+      // silently fail
+    } finally {
+      setIsLoadingLikes(false);
+    }
+  };
 
   // Load post
   useEffect(() => {
@@ -265,9 +284,9 @@ const PostDetail = () => {
               </button>
             </div>
 
-            <p className="font-semibold text-sm text-foreground mb-4">
+            <button onClick={fetchLikes} className="font-semibold text-sm text-foreground mb-4 hover:underline">
               {likeCount.toLocaleString()} likes
-            </p>
+            </button>
 
             {/* Comments */}
             <div className="flex-1 overflow-y-auto space-y-3 mb-4 max-h-64">
@@ -317,6 +336,45 @@ const PostDetail = () => {
             </form>
           </motion.div>
         </div>
+
+        {/* Likes Modal */}
+        <Dialog open={isLikesModalOpen} onOpenChange={setIsLikesModalOpen}>
+          <DialogContent className="sm:max-w-md bg-background border-border">
+            <DialogHeader>
+              <DialogTitle className="text-center font-display text-lg">Likes</DialogTitle>
+            </DialogHeader>
+            <div className="max-h-[60vh] overflow-y-auto space-y-4 py-4">
+              {isLoadingLikes ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                </div>
+              ) : likesUsers.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No likes yet.
+                </div>
+              ) : (
+                likesUsers.map((u) => (
+                  <div key={u.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {u.avatar_url ? (
+                        <img src={u.avatar_url} alt="" className="w-10 h-10 rounded-full object-cover ring-2 ring-gold/20" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center ring-2 ring-gold/20">
+                          <span className="text-sm font-bold text-primary">{u.full_name[0]?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">{u.full_name}</p>
+                        <p className="text-xs text-muted-foreground">@{u.username || u.email.split("@")[0]}</p>
+                      </div>
+                    </div>
+                    {user?.id !== u.id && <FollowButton userId={u.id} />}
+                  </div>
+                ))
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
       </div>
     </AppLayout>

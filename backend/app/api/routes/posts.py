@@ -486,6 +486,40 @@ async def get_post(post_id: str):
     return await build_post_response(post, user, "")
 
 
+# ── GET /posts/{post_id}/likes ───────────────────────────────────────────────
+@router.get("/{post_id}/likes")
+async def get_post_likes(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    likes = await PostLike.find(PostLike.post_id == post_id).to_list()
+    if not likes:
+        return []
+
+    from beanie import PydanticObjectId
+    user_ids = [like.user_id for like in likes]
+    object_ids = []
+    for uid in user_ids:
+        try:
+            object_ids.append(PydanticObjectId(uid))
+        except Exception:
+            pass
+
+    users = await User.find({"_id": {"$in": object_ids}}).to_list()
+    
+    result = []
+    for u in users:
+        result.append({
+            "id": str(u.id),
+            "email": u.email,
+            "full_name": u.full_name,
+            "username": u.username,
+            "avatar_url": u.avatar_url,
+            "hair_type": u.hair_type
+        })
+    return result
+
+
 # ── POST /posts/{post_id}/like — toggle post like ────────────────────────────
 @router.post("/{post_id}/like")
 async def toggle_like(

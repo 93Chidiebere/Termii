@@ -95,6 +95,7 @@ export interface ApiUser {
   full_name: string;
   hair_type?: string;
   avatar_url?: string;
+  username?: string;
 }
 
 export const searchUsers = async (query: string): Promise<ApiUser[]> => {
@@ -201,6 +202,11 @@ export const getPostById = async (postId: string): Promise<Post> => {
 
 export const toggleLike = async (postId: string): Promise<{ liked: boolean; likes_count: number }> => {
   const response = await apiClient.post(`/posts/${postId}/like`);
+  return response.data;
+};
+
+export const getPostLikes = async (postId: string): Promise<ApiUser[]> => {
+  const response = await apiClient.get(`/posts/${postId}/likes`);
   return response.data;
 };
 
