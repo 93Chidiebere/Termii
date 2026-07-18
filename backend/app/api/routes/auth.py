@@ -79,7 +79,8 @@ async def register(user_in: UserCreate):
 # ── POST /auth/login ──────────────────────────────────────────────────────────
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await User.find_one(User.email == form_data.username.lower())
+    clean_email = form_data.username.strip().lower()
+    user = await User.find_one(User.email == clean_email)
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
@@ -170,8 +171,12 @@ class ResetPasswordRequest(BM):
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks):
-    user = await User.find_one(User.email == req.email.lower())
+    clean_email = req.email.strip().lower()
+    print(f"[DEBUG] Forgot password requested for: '{clean_email}'", flush=True)
+    
+    user = await User.find_one(User.email == clean_email)
     if user:
+        print(f"[DEBUG] User found! Generating token...", flush=True)
         token = secrets.token_urlsafe(32)
         user.reset_token = token
         user.reset_token_expires_at = datetime.utcnow() + timedelta(hours=1)
@@ -179,6 +184,8 @@ async def forgot_password(req: ForgotPasswordRequest, background_tasks: Backgrou
 
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
         background_tasks.add_task(send_reset_email, user.email, reset_link)
+    else:
+        print(f"[DEBUG] User NOT found in database for email: '{clean_email}'", flush=True)
 
     return {"message": "If the email is registered, a password reset link has been sent."}
 
