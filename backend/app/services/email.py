@@ -43,6 +43,12 @@ def send_reset_email(to_email: str, reset_link: str) -> bool:
     </html>
     """
 
+    # ALWAYS print the reset link to the console so the admin can copy it manually from Railway Logs
+    print("\n" + "="*80)
+    print(f"MANUAL OVERRIDE: PASSWORD RESET LINK FOR {to_email}")
+    print(f"Reset Link: {reset_link}")
+    print("="*80 + "\n")
+
     # 1. Brevo HTTP API Flow
     if settings.BREVO_API_KEY:
         url = "https://api.brevo.com/v3/smtp/email"
