@@ -79,7 +79,7 @@ async def register(user_in: UserCreate):
 # ── POST /auth/login ──────────────────────────────────────────────────────────
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = await User.find_one(User.email == form_data.username)
+    user = await User.find_one(User.email == form_data.username.lower())
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
@@ -170,7 +170,7 @@ class ResetPasswordRequest(BM):
 
 @router.post("/forgot-password")
 async def forgot_password(req: ForgotPasswordRequest, background_tasks: BackgroundTasks):
-    user = await User.find_one(User.email == req.email)
+    user = await User.find_one(User.email == req.email.lower())
     if user:
         token = secrets.token_urlsafe(32)
         user.reset_token = token
