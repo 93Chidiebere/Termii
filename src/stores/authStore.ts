@@ -180,7 +180,7 @@ export const useAuthStore = create<AuthState>()(
     {
       name: "termii-auth",
       partialize: (state) => ({
-        user: state.user,
+        user: state.user ? { ...state.user, avatar: "" } : null,
         isAuthenticated: state.isAuthenticated,
         ageVerified: state.ageVerified,
         hasDateOfBirth: state.hasDateOfBirth,
