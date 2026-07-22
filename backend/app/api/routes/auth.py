@@ -80,8 +80,19 @@ async def register(user_in: UserCreate):
 @router.post("/login")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     clean_email = form_data.username.strip().lower()
+    print(f"[DEBUG] Login attempt for: '{clean_email}'", flush=True)
     user = await User.find_one(User.email == clean_email)
-    if not user or not verify_password(form_data.password, user.hashed_password):
+    
+    if not user:
+        print(f"[DEBUG] Login failed: User '{clean_email}' not found.", flush=True)
+        raise HTTPException(status_code=400, detail="Incorrect email or password")
+        
+    print(f"[DEBUG] Login user found. Hash len: {len(user.hashed_password) if user.hashed_password else 0}", flush=True)
+    
+    is_valid = verify_password(form_data.password, user.hashed_password)
+    print(f"[DEBUG] Password valid: {is_valid}", flush=True)
+    
+    if not is_valid:
         raise HTTPException(status_code=400, detail="Incorrect email or password")
 
     if getattr(user, "status", "active") == "banned":
@@ -201,11 +212,17 @@ async def reset_password(req: ResetPasswordRequest):
         User.reset_token_expires_at > datetime.utcnow()
     )
     if not user:
+        print(f"[DEBUG] Reset failed: invalid/expired token: {req.token}", flush=True)
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
 
-    user.hashed_password = get_password_hash(req.new_password)
+    print(f"[DEBUG] Resetting password for user: {user.email}", flush=True)
+    new_hash = get_password_hash(req.new_password)
+    print(f"[DEBUG] New hash generated (len: {len(new_hash)})", flush=True)
+    
+    user.hashed_password = new_hash
     user.reset_token = None
     user.reset_token_expires_at = None
     await user.save()
+    print(f"[DEBUG] Password saved successfully to DB", flush=True)
 
     return {"message": "Password has been reset successfully."}
