@@ -88,17 +88,18 @@ export const useAuthStore = create<AuthState>()(
           useRoleStore.getState().setIsAdmin(profile.is_admin ?? false);
 
         } catch (err: unknown) {
+          console.error("DEBUG LOGIN ERROR:", err);
           let message = "Login failed. Please check your email and password.";
+          if (err instanceof Error) {
+            message = `Client Error: ${err.message}`;
+          }
           if (
             err &&
             typeof err === "object" &&
             "response" in err &&
-            (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+            (err as any).response?.data?.detail
           ) {
-            message = String(
-              (err as { response: { data: { detail: string } } }).response.data
-                .detail
-            );
+            message = String((err as any).response.data.detail);
           }
           set({ isLoading: false, error: message, isAuthenticated: false });
         }
