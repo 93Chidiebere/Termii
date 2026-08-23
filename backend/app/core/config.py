@@ -2,6 +2,7 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     MONGODB_URI: str
+    REDIS_URI: str = "" # Optional so the app doesn't crash if missing
     JWT_SECRET: str
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 43200
