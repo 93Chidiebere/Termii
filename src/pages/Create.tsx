@@ -213,7 +213,9 @@ const Create = () => {
 
     } catch (err: unknown) {
       let message = "Failed to share post. Please try again.";
-      if (
+      if (err instanceof Error) {
+        message = `Error: ${err.message}`;
+      } else if (
         err &&
         typeof err === "object" &&
         "response" in err &&
