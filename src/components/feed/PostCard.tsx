@@ -343,7 +343,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   };
 
   const handleShare = () => {
-    const url = `${window.location.origin}/post/${post.id}`;
+    const url = `https://api.isingala.com/posts/${post.id}/share`;
     navigator.clipboard?.writeText(url).catch(() => {});
     toast({ title: "Link copied", description: "Post link copied to clipboard." });
   };
@@ -366,7 +366,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
         await navigator.share({
           files: [file],
           title: "Isi Ngala",
-          text: `Check out ${post.user.displayName}'s post on Isi Ngala! ${window.location.origin}/post/${post.id}`,
+          text: `Check out ${post.user.displayName}'s post on Isi Ngala! https://api.isingala.com/posts/${post.id}/share`,
         });
       } else {
         const url = URL.createObjectURL(blob);

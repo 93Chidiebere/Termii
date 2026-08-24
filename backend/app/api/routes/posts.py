@@ -777,3 +777,68 @@ async def toggle_comment_like(
         CommentLike.comment_id == comment_id
     ).count()
     return {"liked": liked, "likes_count": likes_count}
+
+
+# ── GET /posts/{post_id}/share — dynamic share preview card ───────────────────
+@router.get("/{post_id}/share")
+async def share_post_preview(post_id: str):
+    from fastapi.responses import HTMLResponse
+    from app.core.config import settings
+    
+    post = await Post.get(post_id)
+    if not post:
+        # Fallback to frontend home if post is not found
+        return HTMLResponse(content=f"""
+        <html>
+            <head>
+                <meta http-equiv="refresh" content="0;url={settings.FRONTEND_URL}" />
+            </head>
+            <body>Redirecting...</body>
+        </html>
+        """)
+        
+    try:
+        await post.fetch_link(Post.user)
+        user = post.user
+        user_name = user.full_name
+    except Exception:
+        user_name = "Isi Ngala User"
+
+    title = f"Check out {user_name}'s post on Isi Ngala!"
+    description = post.caption[:150] + "..." if post.caption and len(post.caption) > 150 else (post.caption or "Your Hair is your Pride")
+    
+    # Use post media_url if present, else fallback to standard preview logo
+    image_url = post.media_url or "https://isingala.com/assets/logo.png"
+    
+    redirect_url = f"{settings.FRONTEND_URL}/post/{post_id}"
+    
+    html_content = f"""<!DOCTYPE html>
+    <html>
+        <head>
+            <title>{title}</title>
+            <meta charset="utf-8" />
+            <meta property="og:title" content="{title}" />
+            <meta property="og:description" content="{description}" />
+            <meta property="og:image" content="{image_url}" />
+            <meta property="og:type" content="article" />
+            <meta property="og:url" content="{redirect_url}" />
+            <meta property="og:site_name" content="Isi Ngala" />
+            
+            <!-- Twitter Card tags -->
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="{title}" />
+            <meta name="twitter:description" content="{description}" />
+            <meta name="twitter:image" content="{image_url}" />
+            
+            <!-- Redirect standard browsers to the actual frontend page -->
+            <script type="text/javascript">
+                window.location.replace("{redirect_url}");
+            </script>
+            <meta http-equiv="refresh" content="0;url={redirect_url}" />
+        </head>
+        <body>
+            <p>Redirecting to Isi Ngala... If you are not redirected, <a href="{redirect_url}">click here</a>.</p>
+        </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)

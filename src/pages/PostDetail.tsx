@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useAuthStore } from "@/stores/authStore";
 import { useNotificationStore } from "@/stores/notificationStore";
+import { useToast } from "@/hooks/use-toast";
 import {
   getPostById, toggleLike, toggleSave,
   getComments, addComment, getPostLikes,
@@ -39,6 +40,7 @@ const PostDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { toast } = useToast();
 
   const [post, setPost] = useState<Post | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -270,9 +272,22 @@ const PostDetail = () => {
                 <button onClick={() => document.getElementById(`comment-input-${post.id}`)?.focus()}>
                   <MessageCircle size={24} className="text-foreground" strokeWidth={1.5} />
                 </button>
-                <button onClick={() => {
-                  const url = `${window.location.origin}/post/${post.id}`;
-                  navigator.clipboard?.writeText(url).catch(() => {});
+                <button onClick={async () => {
+                  const url = `https://api.isingala.com/posts/${post.id}/share`;
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: "Isi Ngala",
+                        text: `Check out ${post.user.displayName}'s post on Isi Ngala!`,
+                        url: url,
+                      });
+                    } catch {
+                      // user cancelled or sharing failed
+                    }
+                  } else {
+                    navigator.clipboard?.writeText(url).catch(() => {});
+                    toast({ title: "Link copied", description: "Post link copied to clipboard." });
+                  }
                 }}>
                   <Share2 size={22} className="text-foreground" strokeWidth={1.5} />
                 </button>
