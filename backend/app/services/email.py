@@ -106,3 +106,112 @@ def send_reset_email(to_email: str, reset_link: str) -> bool:
     print(f"Reset Link: {reset_link}")
     print("="*80 + "\n")
     return True
+
+
+def send_new_post_email_broadcast(to_emails: list, author_name: str, caption: str, post_id: str, media_url: str = None) -> bool:
+    """
+    Sends a notification email to all users when a new post is made.
+    Sends in chunks of 50 BCCs using Brevo if configured, or falls back to SMTP loop / console.
+    """
+    if not to_emails:
+        return True
+
+    redirect_url = f"{settings.FRONTEND_URL}/post/{post_id}"
+    image_html = f"""
+    <div style="text-align: center; margin: 20px 0;">
+        <img src="{media_url}" style="max-width: 100%; max-height: 350px; border-radius: 8px; object-fit: cover;" />
+    </div>
+    """ if media_url else ""
+
+    html_content = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h2 style="color: #8B4513; margin: 0; font-size: 24px;">Isi Ngala</h2>
+                <p style="color: #718096; font-size: 14px; text-transform: uppercase; margin: 5px 0 0 0;">Your Hair is Your Pride</p>
+            </div>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 20px;" />
+            <p><strong>{author_name}</strong> just shared a new post on Isi Ngala!</p>
+            <div style="background-color: #f7fafc; padding: 15px; border-radius: 8px; border-left: 4px solid #8B4513; margin: 20px 0;">
+                <p style="margin: 0; font-style: italic; color: #4a5568;">"{caption or 'Click below to view the post.'}"</p>
+            </div>
+            {image_html}
+            <p style="margin: 30px 0; text-align: center;">
+                <a href="{redirect_url}" style="background-color: #8B4513; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block; box-shadow: 0 4px 6px -1px rgba(139, 69, 19, 0.2);">View Post on Isi Ngala</a>
+            </p>
+            <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-top: 30px; margin-bottom: 15px;" />
+            <p style="font-size: 11px; color: #a0aec0; text-align: center; margin: 0;">
+                You are receiving this because you signed up on Isi Ngala.
+            </p>
+        </body>
+    </html>
+    """
+
+    subject = f"New post from {author_name} - Isi Ngala"
+
+    # 1. Brevo HTTP API Flow
+    if settings.BREVO_API_KEY:
+        url = "https://api.brevo.com/v3/smtp/email"
+        headers = {
+            "accept": "application/json",
+            "api-key": settings.BREVO_API_KEY,
+            "content-type": "application/json"
+        }
+        
+        # Chunk recipients into groups of 50 to respect BCC limits and protect privacy
+        for chunk in [to_emails[i:i + 50] for i in range(0, len(to_emails), 50)]:
+            payload = {
+                "sender": {"email": settings.SMTP_SENDER, "name": "Isi Ngala"},
+                "to": [{"email": settings.SMTP_SENDER, "name": "Isi Ngala User"}],
+                "bcc": [{"email": email} for email in chunk],
+                "subject": subject,
+                "htmlContent": html_content
+            }
+            try:
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers=headers,
+                    method='POST'
+                )
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    logger.info(f"New post broadcast sent via Brevo API chunk of {len(chunk)} users")
+            except Exception as e:
+                logger.error(f"Failed to send email broadcast via Brevo API: {str(e)}")
+        return True
+
+    # 2. Standard SMTP Flow
+    if settings.SMTP_HOST and settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
+        try:
+            server = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10)
+            server.starttls()
+            server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
+
+            for email in to_emails:
+                try:
+                    msg = MIMEMultipart()
+                    msg['From'] = settings.SMTP_SENDER
+                    msg['To'] = email
+                    msg['Subject'] = subject
+                    msg.attach(MIMEText(html_content, 'html'))
+                    server.sendmail(settings.SMTP_SENDER, email, msg.as_string())
+                except Exception as e:
+                    logger.error(f"Failed to send SMTP email to {email}: {str(e)}")
+            
+            server.quit()
+            logger.info("New post broadcast sent via SMTP loop")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize SMTP email broadcast: {str(e)}")
+            return False
+
+    # 3. Console Fallback
+    logger.warning("Email sending not configured. Broadcast emails logged to console.")
+    print("\n" + "="*80)
+    print(f"DEVELOPMENT BROADCAST EMAIL: New post by {author_name}")
+    print(f"BCC: {', '.join(to_emails)}")
+    print(f"Caption: {caption}")
+    print(f"Media: {media_url}")
+    print(f"Post ID: {post_id}")
+    print("="*80 + "\n")
+    return True

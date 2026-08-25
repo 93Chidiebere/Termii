@@ -383,13 +383,32 @@ async def create_post(
     actor_name = current_user.full_name
     caption_preview = post.caption[:80] + ("..." if len(post.caption) > 80 else "")
 
-    # ── Push to ALL users (excluding the poster) ──────────────────────────
-    asyncio.create_task(send_push_to_all(
-        title=f"{actor_name} just posted on Isi Ngala",
-        body=caption_preview,
-        url=f"/post/{post_id}",
-        exclude_user_id=actor_id,
-    ))
+    # ── Push & Email Broadcast to ALL users (excluding the poster) ──────────
+    async def notify_all_users():
+        # 1. Web Push Notification
+        await send_push_to_all(
+            title=f"{actor_name} just posted on Isi Ngala",
+            body=caption_preview,
+            url=f"/post/{post_id}",
+            exclude_user_id=actor_id,
+        )
+        # 2. Email Notification Broadcast
+        try:
+            from app.services.email import send_new_post_email_broadcast
+            other_users = await User.find(User.id != current_user.id).to_list()
+            recipient_emails = [u.email for u in other_users if u.email]
+            if recipient_emails:
+                send_new_post_email_broadcast(
+                    to_emails=recipient_emails,
+                    author_name=actor_name,
+                    caption=post.caption,
+                    post_id=post_id,
+                    media_url=post.media_url,
+                )
+        except Exception:
+            pass
+
+    asyncio.create_task(notify_all_users())
 
     # ── Handle @mentions in caption ───────────────────────────────────────
     mentioned_usernames = extract_mentions(post.caption)
