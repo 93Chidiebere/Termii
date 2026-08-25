@@ -24,19 +24,37 @@ async def get_vapid_public_key():
     return {"public_key": settings.VAPID_PUBLIC_KEY}
 
 
+from fastapi import Request
+
 @router.post("/subscribe")
 async def subscribe(
     sub: PushSubscriptionCreate,
-    current_user: User = Depends(get_current_user),
+    request: Request,
 ):
-    user_id = str(current_user.id)
+    # Dynamically check for optional authenticated user token
+    user_id = None
+    auth_header = request.headers.get("Authorization")
+    if auth_header and auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        try:
+            from jose import jwt
+            from app.core.config import settings
+            from app.models.user import User
+            payload = jwt.decode(token, settings.JWT_SECRET, algorithms=[settings.ALGORITHM])
+            email = payload.get("sub")
+            if email:
+                user = await User.find_one(User.email == email)
+                if user:
+                    user_id = str(user.id)
+        except Exception:
+            pass
 
-    # Update existing or create new subscription for this user
+    # Find subscription strictly by browser endpoint
     existing = await PushSubscription.find_one(
-        PushSubscription.user_id == user_id,
-        PushSubscription.endpoint == sub.endpoint,
+        PushSubscription.endpoint == sub.endpoint
     )
     if existing:
+        existing.user_id = user_id  # Update user ID if user logs in
         existing.p256dh = sub.keys.p256dh
         existing.auth = sub.keys.auth
         await existing.save()
@@ -54,11 +72,9 @@ async def subscribe(
 @router.delete("/unsubscribe")
 async def unsubscribe(
     sub: PushSubscriptionCreate,
-    current_user: User = Depends(get_current_user),
 ):
     existing = await PushSubscription.find_one(
-        PushSubscription.user_id == str(current_user.id),
-        PushSubscription.endpoint == sub.endpoint,
+        PushSubscription.endpoint == sub.endpoint
     )
     if existing:
         await existing.delete()

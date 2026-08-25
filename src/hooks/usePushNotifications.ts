@@ -12,26 +12,32 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 export const usePushNotifications = () => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
 
   useEffect(() => {
-    if (!isAuthenticated) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
     if (!VAPID_PUBLIC_KEY) return;
 
     const subscribe = async () => {
       try {
+        const registration = await navigator.serviceWorker.ready;
+        let subscription = await registration.pushManager.getSubscription();
+
+        const currentUserId = user?.id || "guest";
+        const lastSyncedUser = localStorage.getItem("push-synced-user");
+
+        // If already subscribed and synced for current user session/state, skip API call
+        if (subscription && lastSyncedUser === currentUserId) return;
+
         const permission = await Notification.requestPermission();
         if (permission !== "granted") return;
 
-        const registration = await navigator.serviceWorker.ready;
-        const existing = await registration.pushManager.getSubscription();
-        if (existing) return; // Already subscribed
-
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-        });
+        if (!subscription) {
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          });
+        }
 
         const sub = subscription.toJSON();
         await apiClient.post("/push/subscribe", {
@@ -41,6 +47,8 @@ export const usePushNotifications = () => {
             auth: sub.keys?.auth,
           },
         });
+
+        localStorage.setItem("push-synced-user", currentUserId);
       } catch {
         // Permission denied or subscription failed — silently ignore
       }
@@ -49,5 +57,5 @@ export const usePushNotifications = () => {
     // Slight delay so the user is settled in the app before the permission prompt
     const timer = setTimeout(subscribe, 5000);
     return () => clearTimeout(timer);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, user?.id]);
 };

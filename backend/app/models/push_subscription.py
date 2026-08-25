@@ -1,10 +1,11 @@
 from beanie import Document
 from datetime import datetime
 from pydantic import Field
+from typing import Optional
 
 
 class PushSubscription(Document):
-    user_id: str
+    user_id: Optional[str] = None
     endpoint: str
     p256dh: str
     auth: str
