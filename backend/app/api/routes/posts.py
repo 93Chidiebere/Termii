@@ -395,7 +395,7 @@ async def create_post(
         # 2. Email Notification Broadcast
         try:
             from app.services.email import send_new_post_email_broadcast
-            other_users = await User.find(User.id != current_user.id).to_list()
+            other_users = await User.find({"_id": {"$ne": current_user.id}}).to_list()
             recipient_emails = [u.email for u in other_users if u.email]
             if recipient_emails:
                 send_new_post_email_broadcast(
