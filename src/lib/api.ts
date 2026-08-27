@@ -200,6 +200,11 @@ export const getPostById = async (postId: string): Promise<Post> => {
   return transformPost(response.data);
 };
 
+export const deletePost = async (postId: string): Promise<{ message: string }> => {
+  const response = await apiClient.delete(`/posts/${postId}`);
+  return response.data;
+};
+
 export const toggleLike = async (postId: string): Promise<{ liked: boolean; likes_count: number }> => {
   const response = await apiClient.post(`/posts/${postId}/like`);
   return response.data;

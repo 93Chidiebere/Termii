@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Heart, MessageCircle, Bookmark, Share2, MoreHorizontal,
-  Send, Loader2, ChevronDown, Image as ImageIcon,
+  Send, Loader2, ChevronDown, Image as ImageIcon, Trash2
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -10,9 +10,10 @@ import { useFollowStore } from "@/stores/followStore";
 import { useBlockMuteStore } from "@/stores/blockMuteStore";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthStore } from "@/stores/authStore";
+import { useRoleStore } from "@/stores/roleStore";
 import {
   toggleLike, toggleSave, getComments, addComment,
-  toggleCommentLike, getMentionSuggestions,
+  toggleCommentLike, getMentionSuggestions, deletePost,
   type ApiComment, type ApiUser,
 } from "@/lib/api";
 import { BlockMuteMenu } from "@/components/user/BlockMuteMenu";
@@ -227,6 +228,23 @@ export const PostCard = ({ post, index }: PostCardProps) => {
   const { toast } = useToast();
   const following = isFollowing(post.userId);
   const isOwnPost = user?.id === post.userId;
+  const isAdmin = useRoleStore((s) => s.isAdmin);
+  const canDelete = isOwnPost || isAdmin;
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);
+
+  const handleDelete = async () => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    setIsDeleting(true);
+    try {
+      await deletePost(post.id);
+      setIsDeleted(true);
+      toast({ title: "Post deleted successfully" });
+    } catch {
+      toast({ title: "Failed to delete post", variant: "destructive" });
+      setIsDeleting(false);
+    }
+  };
 
   // Comments state
   const [previewComment, setPreviewComment] = useState<ApiComment | null>(null);
@@ -304,7 +322,7 @@ export const PostCard = ({ post, index }: PostCardProps) => {
     }
   };
 
-  if (isBlocked(post.userId)) return null;
+  if (isBlocked(post.userId) || isDeleted) return null;
 
   const isVideo =
     (post as any).mediaType === "video" ||
@@ -417,10 +435,22 @@ export const PostCard = ({ post, index }: PostCardProps) => {
             {following ? "Following" : "Follow"}
           </button>
         )}
+        
+        {canDelete && (
+          <button
+            onClick={handleDelete}
+            disabled={isDeleting}
+            className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors disabled:opacity-50"
+            title="Delete post"
+          >
+            {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+          </button>
+        )}
+
         {!isOwnPost && (
           <Popover open={menuOpen} onOpenChange={setMenuOpen}>
             <PopoverTrigger asChild>
-              <button className="p-1 rounded-lg hover:bg-muted transition-colors">
+              <button className="p-1.5 rounded-lg hover:bg-muted transition-colors">
                 <MoreHorizontal size={18} className="text-muted-foreground" />
               </button>
             </PopoverTrigger>

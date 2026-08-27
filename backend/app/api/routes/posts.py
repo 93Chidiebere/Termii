@@ -621,6 +621,39 @@ async def toggle_save(
 
 
 # ── GET /posts/{post_id}/comments ────────────────────────────────────────────
+@router.delete("/{post_id}")
+async def delete_post(
+    post_id: str,
+    current_user: User = Depends(get_current_user),
+):
+    post = await Post.get(post_id)
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+        
+    await post.fetch_link(Post.user)
+    owner_id = str(post.user.id) if hasattr(post.user, "id") else None
+    
+    if owner_id != str(current_user.id) and not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this post")
+        
+    # Delete the post
+    await post.delete()
+    
+    # Optionally delete associated data (likes, saves, comments)
+    await PostLike.find(PostLike.post_id == post_id).delete()
+    await PostSave.find(PostSave.post_id == post_id).delete()
+    
+    # Delete comments and comment likes
+    comments = await PostComment.find(PostComment.post_id == post_id).to_list()
+    comment_ids = [str(c.id) for c in comments]
+    if comment_ids:
+        await PostComment.find(PostComment.post_id == post_id).delete()
+        await CommentLike.find({"comment_id": {"$in": comment_ids}}).delete()
+        
+    return {"message": "Post deleted successfully"}
+
+
+# ── GET /posts/{post_id}/comments ────────────────────────────────────────────
 @router.get("/{post_id}/comments", response_model=List[CommentResponse])
 async def get_comments(
     post_id: str,
