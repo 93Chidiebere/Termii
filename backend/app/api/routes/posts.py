@@ -400,12 +400,13 @@ async def create_post(
             other_users = await User.find({"_id": {"$ne": current_user.id}}).to_list()
             recipient_emails = [u.email for u in other_users if u.email]
             if recipient_emails:
-                send_new_post_email_broadcast(
-                    to_emails=recipient_emails,
-                    author_name=actor_name,
-                    caption=post.caption,
-                    post_id=post_id,
-                    media_url=post.media_url,
+                await asyncio.to_thread(
+                    send_new_post_email_broadcast,
+                    recipient_emails,
+                    actor_name,
+                    post.caption,
+                    post_id,
+                    post.media_url,
                 )
         except Exception:
             pass
