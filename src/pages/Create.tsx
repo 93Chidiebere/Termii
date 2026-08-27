@@ -32,7 +32,6 @@ const uploadToB2 = async (
   formData.append("file", file);
 
   await axios.post(presignData.url, formData, {
-    headers: { "Content-Type": "multipart/form-data" },
     onUploadProgress: (progressEvent) => {
       if (progressEvent.total && onProgress) {
         onProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
