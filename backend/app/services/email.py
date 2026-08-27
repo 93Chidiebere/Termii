@@ -158,6 +158,7 @@ def send_new_post_email_broadcast(to_emails: list, author_name: str, caption: st
             "content-type": "application/json"
         }
         
+        brevo_success = True
         # Chunk recipients into groups of 50 to respect BCC limits and protect privacy
         for chunk in [to_emails[i:i + 50] for i in range(0, len(to_emails), 50)]:
             payload = {
@@ -178,7 +179,11 @@ def send_new_post_email_broadcast(to_emails: list, author_name: str, caption: st
                     logger.info(f"New post broadcast sent via Brevo API chunk of {len(chunk)} users")
             except Exception as e:
                 logger.error(f"Failed to send email broadcast via Brevo API: {str(e)}")
-        return True
+                brevo_success = False
+                break
+                
+        if brevo_success:
+            return True
 
     # 2. Standard SMTP Flow
     if settings.SMTP_HOST and settings.SMTP_USERNAME and settings.SMTP_PASSWORD:
