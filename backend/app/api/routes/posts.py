@@ -319,7 +319,7 @@ async def send_ws_notification(
 
 
 # ── POST /posts/presign — generate presigned upload URL ──────────────────────
-from app.services.s3 import create_presigned_post
+from app.services.s3 import create_presigned_put
 
 class PresignRequest(BaseModel):
     filename: str
@@ -336,15 +336,17 @@ async def get_presigned_upload(
     ext = req.filename.split(".")[-1] if "." in req.filename else "mp4"
     object_name = f"posts/{uuid.uuid4()}.{ext}"
     
-    response = create_presigned_post(object_name, req.file_type)
-    if not response:
+    presigned_url = create_presigned_put(object_name, req.file_type)
+    if not presigned_url:
         raise HTTPException(status_code=500, detail="Could not generate presigned upload URL")
         
     endpoint = settings.S3_ENDPOINT_URL.rstrip('/')
     public_url = f"{endpoint}/{settings.S3_BUCKET_NAME}/{object_name}"
     
-    response["media_url"] = public_url
-    return response
+    return {
+        "url": presigned_url,
+        "media_url": public_url
+    }
 
 
 # ── POST /posts/ — create a new post ─────────────────────────────────────────

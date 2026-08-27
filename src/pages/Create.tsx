@@ -24,14 +24,9 @@ const uploadToB2 = async (
   onProgress?: (pct: number) => void
 ): Promise<string> => {
   const presignData = await getPresignedUploadUrl(file.name, file.type);
-  const formData = new FormData();
   
-  Object.entries(presignData.fields).forEach(([key, value]) => {
-    formData.append(key, value);
-  });
-  formData.append("file", file);
-
-  await axios.post(presignData.url, formData, {
+  await axios.put(presignData.url, file, {
+    headers: { "Content-Type": file.type },
     onUploadProgress: (progressEvent) => {
       if (progressEvent.total && onProgress) {
         onProgress(Math.round((progressEvent.loaded / progressEvent.total) * 100));
